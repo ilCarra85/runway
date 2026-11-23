@@ -84,10 +84,28 @@ export function Settings() {
 
       <section className="card">
         <h3 className="card-title danger"><Trash2 size={18} /> Zona pericolosa</h3>
+        <p className="muted small">
+          <b>Ricomincia da capo</b> elimina movimenti, ricorrenze e regole su tutti i dispositivi e sul foglio Google
+          (alla prossima sync); categorie e conti restano. Gli estratti conto e i documenti delle cartelle si potranno reimportare.
+        </p>
+        <button className="btn ghost danger" onClick={async () => {
+          const n = state.movements.filter((m) => !m.deleted).length, r = state.recurrences.filter((x) => !x.deleted).length;
+          if (!await confirmDialog(`Eliminare ${n} movimenti e ${r} ricorrenze su tutti i dispositivi e sul foglio Google? Categorie e conti restano. Non si può annullare: se vuoi, prima scarica un backup.`, { ok: 'Elimina tutto', danger: true })) return;
+          const now = Date.now();
+          // tombstone senza impronte di import né documenti: così estratti conto e PDF delle cartelle si possono reimportare
+          store.replace({
+            ...state,
+            movements: state.movements.map((m) => ({ ...m, deleted: true, importId: undefined, docFileId: undefined, docName: undefined, updatedAt: now })),
+            recurrences: state.recurrences.map((x) => ({ ...x, deleted: true, updatedAt: now })),
+            rules: state.rules.map((x) => ({ ...x, deleted: true, updatedAt: now })),
+            accounts: state.accounts.map((a) => (a.checkDate || a.checkBalance !== undefined ? { ...a, checkDate: undefined, checkBalance: undefined, updatedAt: now } : a))
+          });
+          // la sync automatica parte da sola dopo la modifica e porta le cancellazioni sul foglio
+        }}>Ricomincia da capo</button>
         <button className="btn ghost danger" onClick={async () => {
           if (await confirmDialog('Cancellare TUTTI i dati su questo dispositivo? Se la sync è attiva, i dati sul foglio Google restano e verranno riscaricati.', { ok: 'Cancella tutto', danger: true }))
             store.replace({ ...initialState(), settings: state.settings });
-        }}>Ripristina l'app da zero</button>
+        }}>Cancella solo da questo dispositivo</button>
       </section>
       <p className="muted small center">Runway v0.1</p>
     </div>
