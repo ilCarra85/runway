@@ -1,0 +1,8 @@
+node_modules
+dist
+dev-dist
+.env.local
+*.log
+tmp-import/
+CLAUDE.local.md
+.claude/settings.local.json
