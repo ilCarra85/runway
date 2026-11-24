@@ -8,7 +8,9 @@ import { formatDate } from '../lib/dates';
 import { money } from '../lib/format';
 import { refundOf } from '../lib/stats';
 
-export function RefundLinks({ selected, candidates, categories, onChange, target, near }: {
+export function RefundLinks({ selected, candidates, categories, onChange, target, near, noteOf }: {
+  /** nota sull'uscita (es. già collegata a un'altra entrata). */
+  noteOf?: (m: Movement) => string | undefined;
   /** id delle uscite collegate. */
   selected: string[];
   /** uscite che si possono collegare (comprese quelle già collegate). */
@@ -64,7 +66,7 @@ export function RefundLinks({ selected, candidates, categories, onChange, target
             {rest.map((m) => (
               <button type="button" key={m.id} className="check-item refund-add" onClick={() => onChange([...selected, m.id])}>
                 <Plus size={18} />
-                <span>{m.description}<small>{formatDate(m.date)} · spesa {money(m.amount)}</small></span>
+                <span>{m.description}<small>{formatDate(m.date)} · spesa {money(m.amount)}{noteOf?.(m) ? ` · ${noteOf(m)}` : ''}</small></span>
                 <strong>{money(refundOf(m))}</strong>
               </button>
             ))}

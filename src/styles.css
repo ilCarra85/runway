@@ -474,6 +474,7 @@ button.row:hover { background: var(--surface-2); }
 .refund-tools input { flex: 1; }
 .refund-list { max-height: 320px; overflow-y: auto; }
 .refund-empty { padding: 10px 12px; margin: 0; }
+.doc-open { justify-content: flex-start; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .doc-links { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
 .doc-links-head { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 0.85rem; }
 .doc-links-head > span { flex: 1; }

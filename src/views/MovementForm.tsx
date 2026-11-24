@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Briefcase, CalendarRange, Clock, Trash2 } from 'lucide-react';
+import { Briefcase, CalendarRange, Clock, FileText, Trash2 } from 'lucide-react';
 import type { Kind, Movement, Split } from '../types';
 import { useStore } from '../data/store';
 import { AccountChips, AmountInput, CategoryGrid, Field, Segmented, Sheet, SplitPicker, Toggle, categoryUsage } from '../components/ui';
@@ -9,6 +9,7 @@ import { Badge } from '../components/Icon';
 import { fitsKind, myShare, refundOf } from '../lib/stats';
 import { confirmDialog } from '../components/Dialog';
 import { RefundLinks } from '../components/RefundLinks';
+import { PdfPreview } from './DocReview';
 
 export type MovementDraft = Partial<Movement> & { kind?: Kind };
 
@@ -34,12 +35,19 @@ export function MovementForm({ initial, onClose }: { initial?: MovementDraft; on
   const [notes, setNotes] = useState(initial?.notes ?? '');
   const [error, setError] = useState('');
 
-  // Rimborsi lavoro da collegare a un'entrata (busta paga)
+  // Uscite rimborsabili da collegare a un'entrata (busta paga): quelle da rimborsare, quelle già collegate a questa
+  // e anche quelle collegate a un'altra entrata (per correggere un collegamento sbagliato: scegliendola si sposta qui)
   const refundsAvailable = useMemo(
-    () => state.movements.filter((m) => !m.deleted && m.kind === 'uscita' && m.refund !== 'none' &&
-      (m.refund === 'pending' || m.refundIncomeId === initial?.id)),
-    [state.movements, initial?.id]
+    () => state.movements.filter((m) => !m.deleted && m.kind === 'uscita' && m.refund !== 'none'),
+    [state.movements]
   );
+  const incomeOf = useMemo(() => new Map(state.movements.filter((m) => !m.deleted && m.kind === 'entrata').map((m) => [m.id, m])), [state.movements]);
+  const refundNote = (m: Movement) => {
+    if (m.refund !== 'reimbursed' || !m.refundIncomeId || m.refundIncomeId === initial?.id) return undefined;
+    const inc = incomeOf.get(m.refundIncomeId);
+    return inc ? `ora con «${inc.description}» del ${formatDate(inc.date)}` : undefined;
+  };
+  const [preview, setPreview] = useState(false);
   const [linked, setLinked] = useState<Set<string>>(
     () => new Set(state.movements.filter((m) => !m.deleted && m.refundIncomeId && m.refundIncomeId === initial?.id).map((m) => m.id))
   );
@@ -87,6 +95,8 @@ export function MovementForm({ initial, onClose }: { initial?: MovementDraft; on
     const now = Date.now();
     const id = initial?.id ?? uid();
     const m: Movement = {
+      // campi non modificabili qui (documento, import, buoni pasto) restano quelli del movimento
+      importId: initial?.importId, docFileId: initial?.docFileId, docName: initial?.docName, mealVouchers: initial?.mealVouchers,
       id, kind, amount: value, categoryId, accountId, date,
       description: description.trim() || cat?.name || '',
       split, refund: kind === 'uscita' ? refund : 'none',
@@ -187,20 +197,28 @@ export function MovementForm({ initial, onClose }: { initial?: MovementDraft; on
         </div>
       )}
 
-      {kind === 'entrata' && !fromMonitored && (refundsAvailable.length > 0 || linked.size > 0) && (
+      {kind === 'entrata' && !fromMonitored && refundsAvailable.length > 0 && (
         <div className="toggles">
           <Toggle checked={linkRefunds} onChange={setLinkRefunds} icon={<Briefcase size={20} />} label="Rimborsato"
             hint={linkRefunds
               ? (linkedTotal > 0 ? `${money(linkedTotal)} di rimborsi (${linked.size}): non contano come reddito` : 'Aggiungi le uscite rimborsate da questa entrata')
-              : `${refundsAvailable.filter((m) => m.refund === 'pending').length} uscite da rimborsare`} />
+              : `${refundsAvailable.filter((m) => m.refund === 'pending' && m.date <= date).length} uscite da rimborsare`} />
         </div>
       )}
       {kind === 'entrata' && linkRefunds && (
         <Field label="Uscite rimborsate">
-          <RefundLinks selected={[...linked]} candidates={refundsAvailable} categories={state.categories} near={date}
+          <RefundLinks selected={[...linked]} categories={state.categories} near={date} noteOf={refundNote}
+            candidates={refundsAvailable.filter((m) => m.date <= date || linked.has(m.id))}
             onChange={(ids) => setLinked(new Set(ids))} />
         </Field>
       )}
+
+      {editing && initial?.docFileId && (
+        <button type="button" className="btn ghost doc-open" onClick={() => setPreview(true)}>
+          <FileText size={18} /> Documento: {initial.docName ?? 'anteprima'}
+        </button>
+      )}
+      {preview && initial?.docFileId && <PdfPreview fileId={initial.docFileId} name={initial.docName ?? 'Documento'} onClose={() => setPreview(false)} />}
 
       <Field label="Note"><textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} /></Field>
       {error && <div className="error-msg">{error}</div>}

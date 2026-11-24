@@ -11,36 +11,12 @@ import { downloadFile } from '../sync/drive';
 import { loadPdfjs } from '../import/pdf';
 import { formatDate } from '../lib/dates';
 import { amountToInput, money, parseAmount } from '../lib/format';
-import { myShare, refundOf as refundValue } from '../lib/stats';
-import type { Movement } from '../types';
+import { myShare } from '../lib/stats';
 
 /** Elenco dei documenti trovati nelle cartelle monitorate, da confermare uno per uno o tutti insieme. */
 type RefundSel = { on: boolean; amt: string };
 type R730Sel = { on: boolean; amt: string };
 type BonusSel = { on: boolean; amt: string };
-
-/**
- * Uscite da collegare al rimborso letto in busta: la somma esatta se possibile, altrimenti la più vicina per difetto
- * (in busta ci possono essere spese non registrate). Candidate dalla più recente: di solito si rimborsa il mese prima.
- */
-function pickRefunds(cands: Movement[], target: number): string[] {
-  const goal = Math.round(target * 100);
-  if (goal <= 0 || goal > 1_000_000) return [];
-  const reach = new Map<number, { prev: number; id: string }>([[0, { prev: -1, id: '' }]]);
-  for (const m of cands.slice(0, 40)) {
-    const v = Math.round(refundValue(m) * 100);
-    if (v <= 0) continue;
-    for (const s0 of [...reach.keys()]) {
-      const s1 = s0 + v;
-      if (s1 <= goal && !reach.has(s1)) reach.set(s1, { prev: s0, id: m.id });
-    }
-    if (reach.has(goal)) break;
-  }
-  const best = Math.max(...reach.keys());
-  const ids: string[] = [];
-  for (let s1 = best; s1 > 0; s1 = reach.get(s1)!.prev) ids.push(reach.get(s1)!.id);
-  return ids;
-}
 
 export function DocReview({ onClose }: { onClose: () => void }) {
   const { state } = useStore();
@@ -77,22 +53,8 @@ export function DocReview({ onClose }: { onClose: () => void }) {
   // uscite in attesa di rimborso: le buste paga le rimborsano
   const pending = useMemo(() => state.movements.filter((m) => !m.deleted && m.kind === 'uscita' && m.refund === 'pending')
     .sort((a, b) => a.date.localeCompare(b.date)), [state.movements]);
-  // proposta automatica: per ogni busta (dalla più vecchia) le uscite che tornano esattamente col rimborso letto
-  const auto = useMemo(() => {
-    const out = new Map<string, string[]>();
-    const taken = new Set<string>();
-    const withRefund = inbox.proposals.filter((p) => p.parsed?.refundExpenses).sort((a, b) => a.date.localeCompare(b.date));
-    for (const p of withRefund) {
-      // prima le spese di prima del mese della busta (di solito la busta di aprile rimborsa marzo), dalla più recente
-      const free = pending.filter((m) => !taken.has(m.id) && m.date <= p.date).reverse();
-      const from = p.parsed!.periodFrom ?? p.date;
-      const ids = pickRefunds([...free.filter((m) => m.date < from), ...free.filter((m) => m.date >= from)], p.parsed!.refundExpenses!);
-      ids.forEach((id) => taken.add(id));
-      out.set(key(p), ids);
-    }
-    return out;
-  }, [inbox.proposals, pending]);
-  const linksOf = (p: Proposal) => links[key(p)] ?? auto.get(key(p)) ?? [];
+  // nessun collegamento automatico: le uscite rimborsate le sceglie l'utente
+  const linksOf = (p: Proposal) => links[key(p)] ?? [];
   const r730Of = (p: Proposal): R730Sel => r730s[key(p)] ?? { on: !!p.parsed?.refund730, amt: amountToInput(p.parsed?.refund730) };
   const r730Value = (p: Proposal) => { const x = r730Of(p), v = parseAmount(x.amt); return x.on && Number.isFinite(v) && v > 0 ? v : undefined; };
   const bonusOf = (p: Proposal): BonusSel => bonuses[key(p)] ?? { on: !!p.parsed?.bonus, amt: amountToInput(p.parsed?.bonus) };
@@ -169,6 +131,7 @@ export function DocReview({ onClose }: { onClose: () => void }) {
               {r?.kind === 'entrata' && p.parsed && (() => {
                 const sel = linksOf(p);
                 const others = new Set(inbox.proposals.filter((q) => key(q) !== key(p)).flatMap(linksOf));
+                // tutte le uscite da rimborsare con data fino a quella dell'entrata (tolte quelle scelte per altre buste)
                 const cands = pending.filter((m) => !others.has(m.id) && (m.date <= date || sel.includes(m.id))).reverse();
                 const read = p.parsed.refundExpenses ?? 0;
                 const x7 = r730Of(p), v7 = r730Value(p);
@@ -176,10 +139,10 @@ export function DocReview({ onClose }: { onClose: () => void }) {
                 const salary = Number.isFinite(amount) ? Math.max(0, amount - (v7 ?? 0) - (vb ?? 0)) : NaN;
                 const setSel = (ids: string[]) => setLinks({ ...links, [key(p)]: ids });
                 return (<>
-                  {(read > 0 || sel.length > 0) && (
+                  {(read > 0 || sel.length > 0 || cands.length > 0) && (
                     <div className="doc-links">
-                      <p className="doc-links-head"><Briefcase size={14} /><span>Rimborsato <strong>{money(read)}</strong></span></p>
-                      <RefundLinks selected={sel} candidates={cands} categories={state.categories} target={read} near={date} onChange={setSel} />
+                      <p className="doc-links-head"><Briefcase size={14} /><span>{read > 0 ? <>Rimborsato in busta <strong>{money(read)}</strong></> : 'Uscite rimborsate'}</span></p>
+                      <RefundLinks selected={sel} candidates={cands} categories={state.categories} target={read > 0 ? read : undefined} near={date} onChange={setSel} />
                     </div>
                   )}
                   <div className="doc-refund">
