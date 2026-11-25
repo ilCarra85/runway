@@ -181,7 +181,7 @@ function RecurrenceForm({ initial, onClose }: { initial?: Recurrence; onClose: (
     const docDate = !start && !!folder;
     const lastDoc = initial ? state.movements.filter((m) => !m.deleted && !m.planned && m.recurrenceId === initial.id)
       .reduce((d, m) => (m.date > d ? m.date : d), '') : '';
-    const startValue = docDate ? (initial?.docDate ? initial.start : lastDoc) : start;
+    const startValue = docDate ? (lastDoc > (initial?.start || '') ? lastDoc : initial?.start || '') : start;
     // Voce "da verificare" salvata ancora spenta: probabilmente l'utente vuole attivarla
     let isActive = active;
     if (!active && initial?.toVerify) {

@@ -130,7 +130,7 @@ export function DocInboxProvider({ children }: { children: ReactNode }) {
     const recs = st.recurrences.filter((r) => ids.has(r.id) && !r.deleted && (r.amountAuto || dateFromDoc(r))).map((r) => {
       const amount = r.amountAuto ? estimateAmount(r.id, all, r.categoryId) || r.amount : r.amount;
       const start = dateFromDoc(r)
-        ? all.filter((m) => !m.deleted && !m.planned && m.recurrenceId === r.id && m.occurrence).reduce((d, m) => (m.date > d ? m.date : d), r.start)
+        ? all.filter((m) => !m.deleted && !m.planned && m.recurrenceId === r.id && m.occurrence).reduce((d, m) => (m.date > d ? m.date : d), r.start || '')
         : r.start;
       return { ...r, amount, start, updatedAt: Date.now() };
     });
