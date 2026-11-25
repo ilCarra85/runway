@@ -20,6 +20,7 @@ import type { MovementDraft } from './MovementForm';
 export function Dashboard({ onAdd, goTo }: { onAdd: (d: MovementDraft) => void; goTo: (tab: string) => void }) {
   const { state, upsert } = useStore();
   const [period, setPeriod] = useState<PeriodKey>(() => (localStorage.getItem('runway.period') as PeriodKey) || 'ultimi12');
+  const [allDue, setAllDue] = useState(false);
   const [custom, setCustom] = useState({ from: todayISO().slice(0, 4) + '-01-01', to: todayISO() });
   const [unit, setUnit] = useState<NormUnit>(() => (localStorage.getItem('runway.unit') as NormUnit) || 'mese');
   const [byGroup, setByGroup] = useState(false);
@@ -171,7 +172,7 @@ export function Dashboard({ onAdd, goTo }: { onAdd: (d: MovementDraft) => void; 
         <section className="card">
           <h3 className="card-title"><CalendarClock size={18} /> Scadenze ricorrenti</h3>
           <div className="list">
-            {due.slice(0, 6).map((d) => {
+            {(allDue ? due : due.slice(0, 6)).map((d) => {
               const r = recMap.get(d.recurrenceId)!;
               const c = ctx.cats.get(r.categoryId);
               return (
@@ -190,7 +191,11 @@ export function Dashboard({ onAdd, goTo }: { onAdd: (d: MovementDraft) => void; 
               );
             })}
           </div>
-          {due.length > 6 && <p className="muted small">e altre {due.length - 6} scadenze dopo queste</p>}
+          {due.length > 6 && (
+            <button className="btn small ghost" onClick={() => setAllDue(!allDue)}>
+              {allDue ? 'Mostra solo le prime 6' : `Mostra tutte (altre ${due.length - 6})`}
+            </button>
+          )}
         </section>
       )}
 
