@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { CheckCircle2, ChevronDown, ChevronRight, FileUp, Repeat, Loader2, Undo2 } from 'lucide-react';
+import { CheckCircle2, ChevronDown, ChevronRight, FileUp, Repeat, History, Loader2, Undo2 } from 'lucide-react';
 import type { Category, Kind, Split } from '../types';
 import { useStore } from '../data/store';
 import { Badge } from '../components/Icon';
@@ -14,11 +14,12 @@ import { buildCommit, emptyDecisions, groupKey, heldRows, isLater, itemChoice, l
 import { confirmDialog } from '../components/Dialog';
 import { cadenceLabel } from '../lib/recurrence';
 import { formatDate } from '../lib/dates';
-import { money } from '../lib/format';
+import { money, uid } from '../lib/format';
 import { alive, fitsKind } from '../lib/stats';
 
 type Filter = 'rivedere' | 'tutti' | 'presenti';
 const PAGE = 40;
+const stamp = (t: number) => new Date(t).toLocaleString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
 export function Import({ onDone }: { onDone: () => void }) {
   const { state, upsertMany, replace } = useStore();
@@ -34,6 +35,8 @@ export function Import({ onDone }: { onDone: () => void }) {
 
   const cats = useMemo(() => new Map(state.categories.map((c) => [c.id, c])), [state.categories]);
   const last = useMemo(() => lastImport(state), [state]);
+  const history = useMemo(() => (state.imports ?? []).filter((x) => !x.deleted).sort((a, b) => b.at - a.at || a.name.localeCompare(b.name)), [state.imports]);
+  const [allHistory, setAllHistory] = useState(false);
   const upd = (fn: (x: Decisions) => void) => setD((cur) => {
     const n: Decisions = {
       groupCat: new Map(cur.groupCat), groupSplit: new Map(cur.groupSplit), rowCat: new Map(cur.rowCat), rowDesc: new Map(cur.rowDesc),
@@ -157,13 +160,33 @@ export function Import({ onDone }: { onDone: () => void }) {
         {last && (
           <section className="card">
             <h3 className="card-title"><Undo2 size={18} /> Ultimo import</h3>
-            <p className="muted small">Del {new Date(last.at).toLocaleString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}:
+            <p className="muted small">Del {stamp(last.at)}:
               {' '}{last.movements} movimenti creati{last.recurrences ? ` e ${last.recurrences} ricorrenze` : ''}.
               Annullandolo vengono eliminati e potrai reimportare gli stessi file.</p>
             <button className="btn ghost danger" onClick={async () => {
               if (!await confirmDialog(`Annullare l'ultimo import? Vengono eliminati ${last.movements} movimenti${last.recurrences ? ` e ${last.recurrences} ricorrenze` : ''} su tutti i dispositivi.`, { ok: 'Annulla import', cancel: 'Indietro', danger: true })) return;
               replace({ ...state, ...undoImport(state, last.at) });
             }}>Annulla l'ultimo import</button>
+          </section>
+        )}
+        {history.length > 0 && (
+          <section className="card">
+            <h3 className="card-title"><History size={18} /> File importati</h3>
+            <div className="imp-list">
+              {(allHistory ? history : history.slice(0, 10)).map((x) => (
+                <div key={x.id} className={`imp-row ${x.undone ? 'off' : ''}`}>
+                  <span className="imp-text">{x.name}
+                    <small>{x.from && x.to ? `Dal ${formatDate(x.from)} al ${formatDate(x.to)} · ` : ''}{x.rows} movimenti letti
+                      {' · '}importato il {stamp(x.at)}{x.undone ? ' · annullato' : ''}</small>
+                  </span>
+                </div>
+              ))}
+            </div>
+            {history.length > 10 && (
+              <button className="btn small ghost" onClick={() => setAllHistory(!allHistory)}>
+                {allHistory ? 'Mostra solo gli ultimi 10' : `Mostra tutti (altri ${history.length - 10})`}
+              </button>
+            )}
           </section>
         )}
       </div>
@@ -190,6 +213,8 @@ export function Import({ onDone }: { onDone: () => void }) {
     if (res.recurrences.length) upsertMany('recurrences', res.recurrences);
     if (res.movements.length) upsertMany('movements', res.movements);
     if (res.rules.length) upsertMany('rules', res.rules);
+    // cronologia: un record per file
+    upsertMany('imports', files.map((f) => ({ id: uid(), name: f.name, from: f.from, to: f.to, rows: f.rows, at: res.at, updatedAt: res.at })));
     setResult(res.stats);
     window.scrollTo(0, 0);
   };

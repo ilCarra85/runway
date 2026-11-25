@@ -99,6 +99,7 @@ export function Settings() {
             movements: state.movements.map((m) => ({ ...m, deleted: true, importId: undefined, docFileId: undefined, docName: undefined, updatedAt: now })),
             recurrences: state.recurrences.map((x) => ({ ...x, deleted: true, docIgnored: undefined, updatedAt: now })),
             rules: state.rules.map((x) => ({ ...x, deleted: true, updatedAt: now })),
+            imports: (state.imports ?? []).map((x) => ({ ...x, deleted: true, updatedAt: now })),
             accounts: state.accounts.map((a) => (a.checkDate || a.checkBalance !== undefined ? { ...a, checkDate: undefined, checkBalance: undefined, updatedAt: now } : a))
           });
           // anche la cronologia dei documenti letti dalle cartelle: si rileggono da zero

@@ -84,6 +84,8 @@ export interface CommitResult {
   recurrences: Recurrence[];
   rules: Rule[];
   stats: { created: number; updated: number; recurrences: number; rules: number };
+  /** Istante dell'import (createdAt dei movimenti creati). */
+  at: number;
 }
 
 /** Ultimo import registrato: i movimenti creati hanno tutti lo stesso createdAt (l'istante della conferma). */
@@ -113,7 +115,7 @@ function undoRecurrences(state: AppState, at: number, mine: Set<string>) {
  * nate dall'import e le regole imparate; i movimenti già presenti perdono l'impronta e quelli tolti tornano.
  * Importo e data corretti dalla banca sui movimenti già presenti restano.
  */
-export function undoImport(state: AppState, at: number): Pick<AppState, 'movements' | 'recurrences' | 'rules'> {
+export function undoImport(state: AppState, at: number): Pick<AppState, 'movements' | 'recurrences' | 'rules' | 'imports'> {
   const now = Date.now();
   // anche quelli già saltati da Home: perdono l'impronta, così il file si reimporta per intero
   const mine = new Set(state.movements.filter((m) => m.importId && m.createdAt === at).map((m) => m.id));
@@ -128,7 +130,9 @@ export function undoImport(state: AppState, at: number): Pick<AppState, 'movemen
       return m;
     }),
     recurrences: state.recurrences.map((r) => (recs.has(r.id) ? { ...r, deleted: true, updatedAt: now } : r)),
-    rules: (state.rules ?? []).map((r) => (!r.deleted && near(r.updatedAt, at) ? { ...r, deleted: true, updatedAt: now } : r))
+    rules: (state.rules ?? []).map((r) => (!r.deleted && near(r.updatedAt, at) ? { ...r, deleted: true, updatedAt: now } : r)),
+    // nella cronologia i file restano, segnati come annullati
+    imports: (state.imports ?? []).map((x) => (x.at === at && !x.undone ? { ...x, undone: true, updatedAt: now } : x))
   };
 }
 
@@ -236,5 +240,5 @@ export function buildCommit(plan: Plan, d: Decisions, state: AppState): CommitRe
     rules.push({ id: ex?.id ?? uid(), key: l.key, kind: l.kind, categoryId: l.categoryId, split: l.split, updatedAt: now });
   }
 
-  return { movements: [...movements.values()], recurrences, rules, stats: { created, updated, recurrences: recurrences.length, rules: rules.length } };
+  return { at: now, movements: [...movements.values()], recurrences, rules, stats: { created, updated, recurrences: recurrences.length, rules: rules.length } };
 }

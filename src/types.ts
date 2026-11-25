@@ -134,6 +134,20 @@ export interface Rule extends Base {
   split?: Split;
 }
 
+/** Cronologia degli import: un record per ogni file importato. */
+export interface ImportLog extends Base {
+  name: string;
+  /** Periodo coperto dal file. */
+  from?: string;
+  to?: string;
+  /** Movimenti letti dal file. */
+  rows: number;
+  /** Istante dell'import (= createdAt dei movimenti creati): lega il file all'import da annullare. */
+  at: number;
+  /** Import annullato con «Annulla l'ultimo import». */
+  undone?: boolean;
+}
+
 export interface Settings {
   spreadsheetId?: string;
   lastSync?: number;
@@ -145,8 +159,9 @@ export interface AppState {
   movements: Movement[];
   recurrences: Recurrence[];
   rules: Rule[];
+  imports: ImportLog[];
   settings: Settings;
 }
 
-export type Collection = 'categories' | 'accounts' | 'movements' | 'recurrences' | 'rules';
-export type Entity = Category | Account | Movement | Recurrence | Rule;
+export type Collection = 'categories' | 'accounts' | 'movements' | 'recurrences' | 'rules' | 'imports';
+export type Entity = Category | Account | Movement | Recurrence | Rule | ImportLog;

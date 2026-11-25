@@ -96,6 +96,7 @@ export function initialState(): AppState {
     movements: [],
     recurrences: seedRecurrences(),
     rules: [],
+    imports: [],
     settings: {}
   };
 }
