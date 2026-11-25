@@ -242,7 +242,8 @@ function RecurrenceForm({ initial, onClose }: { initial?: Recurrence; onClose: (
           setCategoryId(id);
           const c = state.categories.find((x) => x.id === id);
           if (c && !initial) setSplit(c.split);
-          if (!name && c) setName(c.name);
+          // il nome segue la categoria finché non lo scrivi tu (vuoto o uguale al nome di una categoria)
+          if (c && (!name.trim() || state.categories.some((x) => x.name === name.trim()))) setName(c.name);
         }} />
       </Field>
       <Field label="Ripeti">
