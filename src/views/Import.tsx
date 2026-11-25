@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { CheckCircle2, ChevronDown, ChevronRight, FileUp, Repeat, Loader2 } from 'lucide-react';
+import { CheckCircle2, ChevronDown, ChevronRight, FileUp, Repeat, Loader2, Undo2 } from 'lucide-react';
 import type { Category, Kind, Split } from '../types';
 import { useStore } from '../data/store';
 import { Badge } from '../components/Icon';
@@ -10,7 +10,8 @@ import { isUnicredit, parseUnicredit, type BankRow, type Statement } from '../im
 import { readXlsx } from '../import/xlsx';
 import { isSatispay, parseSatispay } from '../import/satispay';
 import { analyze, type Item, type Plan } from '../import/analyze';
-import { buildCommit, emptyDecisions, groupKey, heldRows, itemChoice, recView, type Decisions, type RecChoice } from '../import/commit';
+import { buildCommit, emptyDecisions, groupKey, heldRows, itemChoice, lastImport, recView, undoImport, type Decisions, type RecChoice } from '../import/commit';
+import { confirmDialog } from '../components/Dialog';
 import { cadenceLabel } from '../lib/recurrence';
 import { formatDate } from '../lib/dates';
 import { money } from '../lib/format';
@@ -20,7 +21,7 @@ type Filter = 'rivedere' | 'tutti' | 'presenti';
 const PAGE = 40;
 
 export function Import({ onDone }: { onDone: () => void }) {
-  const { state, upsertMany } = useStore();
+  const { state, upsertMany, replace } = useStore();
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
   const [files, setFiles] = useState<{ name: string; from?: string; to?: string; rows: number }[]>([]);
@@ -32,6 +33,7 @@ export function Import({ onDone }: { onDone: () => void }) {
   const [result, setResult] = useState<ReturnType<typeof buildCommit>['stats'] | null>(null);
 
   const cats = useMemo(() => new Map(state.categories.map((c) => [c.id, c])), [state.categories]);
+  const last = useMemo(() => lastImport(state), [state]);
   const upd = (fn: (x: Decisions) => void) => setD((cur) => {
     const n: Decisions = {
       groupCat: new Map(cur.groupCat), groupSplit: new Map(cur.groupSplit), rowCat: new Map(cur.rowCat), rowDesc: new Map(cur.rowDesc),
@@ -149,6 +151,18 @@ export function Import({ onDone }: { onDone: () => void }) {
           </label>
           {error && <div className="error-msg">{error}</div>}
         </section>
+        {last && (
+          <section className="card">
+            <h3 className="card-title"><Undo2 size={18} /> Ultimo import</h3>
+            <p className="muted small">Del {new Date(last.at).toLocaleString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}:
+              {' '}{last.movements} movimenti creati{last.recurrences ? ` e ${last.recurrences} ricorrenze` : ''}.
+              Annullandolo vengono eliminati e potrai reimportare gli stessi file.</p>
+            <button className="btn ghost danger" onClick={async () => {
+              if (!await confirmDialog(`Annullare l'ultimo import? Vengono eliminati ${last.movements} movimenti${last.recurrences ? ` e ${last.recurrences} ricorrenze` : ''} su tutti i dispositivi.`, { ok: 'Annulla import', cancel: 'Indietro', danger: true })) return;
+              replace({ ...state, ...undoImport(state, last.at) });
+            }}>Annulla l'ultimo import</button>
+          </section>
+        )}
       </div>
     );
   }
@@ -164,7 +178,9 @@ export function Import({ onDone }: { onDone: () => void }) {
   const undecided = reviewGroups.filter((g) => !g.decided);
   const list = filter === 'rivedere' ? reviewGroups : groups;
 
-  const commit = () => {
+  const commit = async () => {
+    // conferma esplicita: un tocco involontario (es. alla riaccensione dello schermo) non deve importare tutto
+    if (!await confirmDialog(`Importare ${toCreate} movimenti${recCount ? ` e ${recCount} ricorrenze` : ''}?`, { ok: 'Importa', cancel: 'Non ancora' })) return;
     const res = buildCommit(plan, d, state);
     if (res.recurrences.length) upsertMany('recurrences', res.recurrences);
     if (res.movements.length) upsertMany('movements', res.movements);

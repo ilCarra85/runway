@@ -77,6 +77,51 @@ export interface CommitResult {
   stats: { created: number; updated: number; recurrences: number; rules: number };
 }
 
+/** Ultimo import registrato: i movimenti creati hanno tutti lo stesso createdAt (l'istante della conferma). */
+export interface LastImport { at: number; movements: number; recurrences: number }
+
+// tolleranza tra l'istante dell'import e il salvataggio (updatedAt viene riscritto dallo store)
+const NEAR = 5000;
+const near = (t: number, at: number) => Math.abs(t - at) < NEAR;
+
+export function lastImport(state: AppState): LastImport | undefined {
+  const created = alive(state.movements).filter((m) => m.importId);
+  if (!created.length) return undefined;
+  const at = created.reduce((t, m) => Math.max(t, m.createdAt), 0);
+  const mine = new Set(created.filter((m) => m.createdAt === at).map((m) => m.id));
+  if (!mine.size) return undefined;
+  return { at, movements: mine.size, recurrences: undoRecurrences(state, at, mine).length };
+}
+
+/** Ricorrenze dell'import da eliminare: salvate in quell'istante e usate solo dai movimenti creati dall'import. */
+function undoRecurrences(state: AppState, at: number, mine: Set<string>) {
+  return alive(state.recurrences).filter((r) => near(r.updatedAt, at) &&
+    !alive(state.movements).some((m) => m.recurrenceId === r.id && !mine.has(m.id)));
+}
+
+/**
+ * Annulla l'ultimo import: elimina i movimenti creati (senza impronta, così il file si può reimportare), le ricorrenze
+ * nate dall'import e le regole imparate; i movimenti già presenti perdono l'impronta e quelli tolti tornano.
+ * Importo e data corretti dalla banca sui movimenti già presenti restano.
+ */
+export function undoImport(state: AppState, at: number): Pick<AppState, 'movements' | 'recurrences' | 'rules'> {
+  const now = Date.now();
+  const mine = new Set(alive(state.movements).filter((m) => m.importId && m.createdAt === at).map((m) => m.id));
+  const recs = new Set(undoRecurrences(state, at, mine).map((r) => r.id));
+  return {
+    movements: state.movements.map((m) => {
+      if (mine.has(m.id)) return { ...m, deleted: true, importId: undefined, updatedAt: now };
+      if (!near(m.updatedAt, at)) return m;
+      if (!m.deleted && m.importId) return { ...m, importId: undefined, updatedAt: now };
+      // generati da una ricorrenza e tolti dall'import (date vecchie): tornano
+      if (m.deleted && !m.importId && m.recurrenceId && !recs.has(m.recurrenceId)) return { ...m, deleted: false, updatedAt: now };
+      return m;
+    }),
+    recurrences: state.recurrences.map((r) => (recs.has(r.id) ? { ...r, deleted: true, updatedAt: now } : r)),
+    rules: (state.rules ?? []).map((r) => (!r.deleted && near(r.updatedAt, at) ? { ...r, deleted: true, updatedAt: now } : r))
+  };
+}
+
 export function buildCommit(plan: Plan, d: Decisions, state: AppState): CommitResult {
   const now = Date.now();
   const cats = new Map(state.categories.map((c) => [c.id, c]));
