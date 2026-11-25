@@ -297,6 +297,8 @@ button.row:hover { background: var(--surface-2); }
 .hero-value { font-size: 40px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.1; margin-top: 4px; }
 .hero-value.neg { color: #ffd2d2 !important; }
 .hero-sub { font-size: 13px; opacity: 0.85; }
+.hero-extra { margin: 0; font-size: 13px; opacity: 0.9; line-height: 1.4; }
+.hero-extra svg { vertical-align: -2px; }
 .hero-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .tile { background: rgba(255, 255, 255, 0.14); border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; }
 .tile-label { font-size: 12px; display: flex; align-items: center; gap: 4px; opacity: 0.9; }

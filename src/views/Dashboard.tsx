@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ArrowDownLeft, ArrowUpRight, Briefcase, FolderSync, Loader2, CalendarClock, Clock, ListChecks, PiggyBank, SkipForward, Target, TriangleAlert, Wallet } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, Briefcase, FolderSync, Loader2, CalendarClock, Clock, ListChecks, PiggyBank, SkipForward, Sparkle, Target, TriangleAlert, Wallet } from 'lucide-react';
 import type { Movement } from '../types';
 import { useStore } from '../data/store';
 import { Badge } from '../components/Icon';
@@ -128,6 +128,14 @@ export function Dashboard({ onAdd, goTo }: { onAdd: (d: MovementDraft) => void; 
             <small>{money(sum.expense)} totali</small>
           </div>
         </div>
+        {(sum.extraExpense > 0 || sum.extraIncome > 0) && (
+          <p className="hero-extra">
+            <Sparkle size={14} /> Esclusi dalle medie i movimenti straordinari:
+            {sum.extraExpense > 0 && <> uscite <b>{money(sum.extraExpense)}</b></>}
+            {sum.extraIncome > 0 && <> entrate <b>{money(sum.extraIncome)}</b></>}
+            . Risparmio reale nel periodo: <b>{money(sum.saving + sum.extraIncome - sum.extraExpense)}</b>
+          </p>
+        )}
       </section>
 
       {inbox.monitored > 0 && (

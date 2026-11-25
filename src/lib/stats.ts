@@ -17,6 +17,8 @@ export interface Flow {
   categoryId: string;
   mine: number; // quota mia, già ripartita sul periodo
   source: 'reale' | 'previsto' | 'ricorrente' | 'variabile';
+  /** Movimento straordinario: fuori dalle medie (vedi summarize). */
+  extra?: boolean;
 }
 
 export interface Ctx {
@@ -79,7 +81,7 @@ export function buildFlows(state: AppState, from: string, to: string, opt: FlowO
     const f = allocation(m, from, to);
     if (!f) continue;
     const mine = effectiveMine(m, ctx) * f;
-    if (mine) flows.push({ kind: m.kind, categoryId: m.categoryId, mine, source: m.planned ? 'previsto' : 'reale' });
+    if (mine) flows.push({ kind: m.kind, categoryId: m.categoryId, mine, source: m.planned ? 'previsto' : 'reale', extra: m.extraordinary || undefined });
   }
   if (opt.includeForecast) {
     const today = todayISO();
@@ -103,21 +105,29 @@ export interface Summary {
   saving: number;
   /** Spese per categoria (la mia quota). */
   byCategory: Map<string, number>;
+  /** Movimenti straordinari, esclusi da income/expense/saving e da byCategory. */
+  extraIncome: number;
+  extraExpense: number;
 }
 
+/** Totali del periodo; i movimenti straordinari restano a parte (extraIncome/extraExpense). */
 export function summarize(flows: Flow[]): Summary {
   let income = 0;
   let expense = 0;
+  let extraIncome = 0;
+  let extraExpense = 0;
   const byCategory = new Map<string, number>();
   for (const f of flows) {
-    if (f.kind === 'entrata') income += f.mine;
+    if (f.extra) {
+      if (f.kind === 'entrata') extraIncome += f.mine; else extraExpense += f.mine;
+    } else if (f.kind === 'entrata') income += f.mine;
     else {
       expense += f.mine;
       // solo le spese: una categoria valida per entrambi non deve sommare le entrate
       byCategory.set(f.categoryId, (byCategory.get(f.categoryId) ?? 0) + f.mine);
     }
   }
-  return { income, expense, saving: income - expense, byCategory };
+  return { income, expense, saving: income - expense, byCategory, extraIncome, extraExpense };
 }
 
 // ---------- Periodi ----------
@@ -170,7 +180,8 @@ export function monthlySeries(state: AppState, months = 12): MonthPoint[] {
   for (let i = 0; i < months; i++) {
     const from = addMonths(first, i);
     const s = summarize(buildFlows(state, from, endOfMonth(from), {}, ctx));
-    out.push({ month: from, income: s.income, expense: s.expense });
+    // il grafico mensile mostra quanto è entrato e uscito davvero, straordinari compresi
+    out.push({ month: from, income: s.income + s.extraIncome, expense: s.expense + s.extraExpense });
   }
   return out;
 }
@@ -192,7 +203,7 @@ export interface Forecast {
 /**
  * Proiezione sui prossimi `months` mesi:
  * - categorie coperte da una ricorrenza attiva → occorrenze future della ricorrenza;
- * - tutte le altre categorie → media reale degli ultimi 6 mesi (entrate e uscite);
+ * - tutte le altre categorie → media reale degli ultimi 6 mesi (entrate e uscite), senza i movimenti straordinari;
  * - più i movimenti segnati come previsti/ipotetici.
  */
 export function forecast(state: AppState, months = 12, extra = 0): Forecast {
@@ -213,7 +224,7 @@ export function forecast(state: AppState, months = 12, extra = 0): Forecast {
   const vFrom = addDays(addMonths(t, -6), 1);
   let varOut = 0, varIn = 0;
   for (const m of state.movements) {
-    if (m.deleted || m.planned || covered.has(m.categoryId)) continue;
+    if (m.deleted || m.planned || m.extraordinary || covered.has(m.categoryId)) continue;
     const f = allocation(m, vFrom, t);
     if (!f) continue;
     const v = effectiveMine(m, ctx) * f;

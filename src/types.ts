@@ -58,6 +58,8 @@ export interface Movement extends Base {
   importId?: string;
   /** Importato e lasciato in sospeso ("Decidi dopo"): si registra o si salta da Home. Conta già nei totali. */
   toConfirm?: boolean;
+  /** Spesa/entrata straordinaria (una tantum): conta nei totali ma non nelle medie né nella previsione. */
+  extraordinary?: boolean;
   /** File Drive (bolletta, busta paga) da cui è stato registrato o confermato. */
   docFileId?: string;
   docName?: string;

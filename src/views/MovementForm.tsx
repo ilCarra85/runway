@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Briefcase, CalendarRange, Clock, FileText, Trash2 } from 'lucide-react';
+import { Briefcase, CalendarRange, Clock, FileText, Sparkle, Trash2 } from 'lucide-react';
 import type { Kind, Movement, Split } from '../types';
 import { useStore } from '../data/store';
 import { AccountChips, AmountInput, CategoryGrid, Field, Segmented, Sheet, SplitPicker, Toggle, categoryUsage } from '../components/ui';
@@ -33,6 +33,7 @@ export function MovementForm({ initial, onClose }: { initial?: MovementDraft; on
   const [compFrom, setCompFrom] = useState((initial?.compFrom ?? date).slice(0, 7));
   const [compTo, setCompTo] = useState((initial?.compTo ?? date).slice(0, 7));
   const [notes, setNotes] = useState(initial?.notes ?? '');
+  const [extraordinary, setExtraordinary] = useState(!!initial?.extraordinary);
   const [error, setError] = useState('');
 
   // Uscite rimborsabili da collegare a un'entrata (busta paga): quelle da rimborsare, quelle già collegate a questa
@@ -105,7 +106,7 @@ export function MovementForm({ initial, onClose }: { initial?: MovementDraft; on
       refundIn: kind === 'entrata' && linkRefunds ? true : undefined,
       compFrom: comp ? compFrom + '-01' : undefined,
       compTo: comp ? endOfMonth(compTo + '-01') : undefined,
-      planned, recurrenceId: initial?.recurrenceId, occurrence: initial?.occurrence,
+      planned, extraordinary: extraordinary || undefined, recurrenceId: initial?.recurrenceId, occurrence: initial?.occurrence,
       notes: notes.trim() || undefined, demo: initial?.demo, createdAt: initial?.createdAt ?? now, updatedAt: now
     };
     upsert('movements', m);
@@ -198,6 +199,9 @@ export function MovementForm({ initial, onClose }: { initial?: MovementDraft; on
         <Toggle checked={planned} onChange={(v) => { setPlanned(v); setPlannedTouched(true); }} icon={<Clock size={20} />}
           label={kind === 'uscita' ? 'Spesa prevista / ipotetica' : 'Entrata prevista'}
           hint="Conta solo nelle proiezioni, non nel consuntivo" />
+        <Toggle checked={extraordinary} onChange={setExtraordinary} icon={<Sparkle size={20} />}
+          label={kind === 'uscita' ? 'Spesa straordinaria' : 'Entrata straordinaria'}
+          hint="Una tantum: conta nei totali ma non nelle medie né nella previsione" />
         <Toggle checked={comp} onChange={setComp} icon={<CalendarRange size={20} />} label="Periodo di competenza"
           hint="Es. bolletta bimestrale: l'importo viene spalmato sui mesi" />
       </div>
