@@ -54,6 +54,7 @@ const IN: C[] = [
   ['stipendio', 'Stipendio', 'Briefcase', 'Lavoro', '#008300'],
   ['mensilita-extra', 'Tredicesima / quattordicesima', 'Award', 'Lavoro', '#008300'],
   ['buoni-pasto-in', 'Buoni pasto', 'Wallet', 'Lavoro', '#008300'],
+  ['buoni-welfare', 'Buoni welfare', 'Gift', 'Lavoro', '#008300'],
   ['bonus', 'Bonus e premi', 'Sparkles', 'Lavoro', '#008300'],
   ['assegno-unico', 'Assegno unico / ANF', 'Users', 'Famiglia', '#1baf7a', HALF],
   ['730', 'Rimborso 730', 'Receipt', 'Altre entrate', '#2a78d6'],
@@ -71,7 +72,8 @@ export const SEED_ACCOUNTS: Account[] = [
   { id: 'conto', name: 'Conto corrente', icon: 'Landmark', kind: 'banca', order: 0, updatedAt: 1 },
   { id: 'satispay', name: 'Satispay', icon: 'Smartphone', kind: 'app', order: 1, updatedAt: 1 },
   { id: 'buoni', name: 'Buoni pasto', icon: 'Wallet', kind: 'buoni', order: 2, updatedAt: 1 },
-  { id: 'contanti', name: 'Contanti', icon: 'Banknote', kind: 'contanti', order: 3, updatedAt: 1 }
+  { id: 'contanti', name: 'Contanti', icon: 'Banknote', kind: 'contanti', order: 3, updatedAt: 1 },
+  { id: 'welfare', name: 'Buoni welfare', icon: 'Gift', kind: 'welfare', order: 4, updatedAt: 1 }
 ];
 
 type R = [name: string, kind: Kind, amount: number, cat: string, every: number, unit: Unit, split?: Split];

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ArrowDownLeft, ArrowUpRight, Briefcase, FolderSync, Loader2, CalendarClock, Clock, ListChecks, PiggyBank, SkipForward, Sparkle, Target, TriangleAlert, Wallet } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, Briefcase, FolderSync, Loader2, CalendarClock, Clock, ListChecks, Gift, PiggyBank, Plus, SkipForward, Sparkle, Target, TriangleAlert, Wallet } from 'lucide-react';
 import type { Movement } from '../types';
 import { useStore } from '../data/store';
 import { Badge } from '../components/Icon';
@@ -7,7 +7,8 @@ import { AmountInput, Segmented } from '../components/ui';
 import { MonthlyChart } from '../components/MonthlyChart';
 import { useDocInbox } from '../docs/inbox';
 import { DocReview } from './DocReview';
-import { VoucherCheck, voucherCheckDue } from './VoucherCheck';
+import { VoucherCheck, voucherCheckDue, welfareCheckDue } from './VoucherCheck';
+import { WELFARE_CAT } from '../lib/vouchers';
 import {
   NORM_DAYS, NORM_LABEL, PERIODS, alive, buildFlows, dueOccurrences, elapsedDays, firstMovementDate, forecast, makeCtx,
   monthlySeries, myShare, pendingRefunds, refundOf, periodRange, summarize, type NormUnit, type PeriodKey
@@ -50,6 +51,13 @@ export function Dashboard({ onAdd, goTo }: { onAdd: (d: MovementDraft) => void; 
   const refundTotal = refunds.reduce((s, m) => s + refundOf(m), 0);
   const buoni = state.accounts.find((a) => a.kind === 'buoni' && !a.deleted);
   const [checkVouchers, setCheckVouchers] = useState(false);
+  const welfare = state.accounts.find((a) => a.kind === 'welfare' && !a.deleted);
+  const [checkWelfare, setCheckWelfare] = useState(false);
+  const welfareDue = welfareCheckDue(state, welfare);
+  const addWelfare = () => welfare && onAdd({
+    kind: 'entrata', categoryId: state.categories.some((c) => c.id === WELFARE_CAT && !c.deleted) ? WELFARE_CAT : undefined,
+    accountId: welfare.id, date: todayISO(), description: 'Buoni welfare', split: { mode: 'pct', value: 100 }, planned: false
+  });
   const vouchersDue = voucherCheckDue(buoni);
   const toVerify = alive(state.recurrences).filter((r) => r.toVerify).length;
   const recMap = new Map(state.recurrences.map((r) => [r.id, r]));
@@ -153,7 +161,7 @@ export function Dashboard({ onAdd, goTo }: { onAdd: (d: MovementDraft) => void; 
       )}
       {docsOpen && <DocReview onClose={() => setDocsOpen(false)} />}
 
-      {(due.length > 0 || refunds.length > 0 || buoni || toVerify > 0) && (
+      {(due.length > 0 || refunds.length > 0 || buoni || welfare || toVerify > 0) && (
         <section className="info-grid">
           {refunds.length > 0 && (
             <button className="card mini" onClick={() => goTo('movimenti')}>
@@ -170,6 +178,20 @@ export function Dashboard({ onAdd, goTo }: { onAdd: (d: MovementDraft) => void; 
                   : <><strong>Controlla</strong><small>Inserisci il saldo della carta</small></>}
               </span>
             </button>
+          )}
+          {welfare && (
+            <div className={`card mini welfare${welfareDue ? ' warn' : ''}`}>
+              <Gift size={20} />
+              <span className="grow"><small>Buoni welfare</small>
+                {welfare.checkBalance !== undefined && welfare.checkDate
+                  ? <><strong>{money(welfare.checkBalance)}</strong><small>{welfareDue ? 'Da ricontrollare · ' : ''}saldo del {formatDate(welfare.checkDate)}</small></>
+                  : <><strong>—</strong><small>Aggiungi quelli ricevuti</small></>}
+              </span>
+              <span className="mini-actions">
+                <button className="btn small" onClick={addWelfare} aria-label="Aggiungi buoni welfare ricevuti"><Plus size={16} /> Ricevuti</button>
+                <button className="btn small ghost" onClick={() => setCheckWelfare(true)}>Saldo</button>
+              </span>
+            </div>
           )}
           {toVerify > 0 && (
             <button className="card mini warn" onClick={() => goTo('ricorrenze')}>
@@ -296,6 +318,7 @@ export function Dashboard({ onAdd, goTo }: { onAdd: (d: MovementDraft) => void; 
         <p className="muted small">Calcolo: ricorrenze attive per le loro categorie, media reale degli ultimi 6 mesi per tutte le altre, più le spese previste.</p>
       </section>
       {checkVouchers && buoni && <VoucherCheck account={buoni} onClose={() => setCheckVouchers(false)} />}
+      {checkWelfare && welfare && <VoucherCheck account={welfare} onClose={() => setCheckWelfare(false)} />}
     </div>
   );
 }

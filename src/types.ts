@@ -28,13 +28,13 @@ export interface Category extends Base {
   excluded?: boolean;
 }
 
-export type AccountKind = 'banca' | 'app' | 'buoni' | 'contanti' | 'carta';
+export type AccountKind = 'banca' | 'app' | 'buoni' | 'welfare' | 'contanti' | 'carta';
 export interface Account extends Base {
   name: string;
   icon: string;
   kind: AccountKind;
   order: number;
-  /** Conto buoni pasto: ultimo controllo del saldo della carta (data, saldo in euro, valore di un buono). */
+  /** Conto buoni pasto o welfare: ultimo controllo del saldo della carta (data, saldo in euro, valore di un buono). */
   checkDate?: string;
   checkBalance?: number;
   voucherValue?: number;

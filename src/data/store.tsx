@@ -159,9 +159,13 @@ export function useStore(): Store {
   return s;
 }
 
-/** Aggiunge ai dati esistenti le categorie predefinite introdotte dopo (es. Rifiuti), se mancano. */
+/** Aggiunge ai dati esistenti le categorie e i conti predefiniti introdotti dopo (es. Rifiuti, Buoni welfare), se mancano. */
 function withNewSeedCategories(s: AppState): AppState {
-  const have = new Set(s.categories.map((c) => c.id));
-  const missing = initialState().categories.filter((c) => !have.has(c.id));
-  return missing.length ? { ...s, categories: [...s.categories, ...missing] } : s;
+  const init = initialState();
+  const haveC = new Set(s.categories.map((c) => c.id));
+  const haveA = new Set(s.accounts.map((a) => a.id));
+  const cats = init.categories.filter((c) => !haveC.has(c.id));
+  const accs = init.accounts.filter((a) => !haveA.has(a.id));
+  if (!cats.length && !accs.length) return s;
+  return { ...s, categories: [...s.categories, ...cats], accounts: [...s.accounts, ...accs] };
 }

@@ -311,6 +311,10 @@ button.row:hover { background: var(--surface-2); }
 .card.mini span { display: flex; flex-direction: column; color: var(--text); }
 .card.mini small { font-size: 12px; color: var(--muted); }
 .card.mini strong { font-size: 18px; }
+.card.mini .grow { flex: 1; min-width: 0; }
+.card.mini.welfare { grid-column: 1 / -1; }
+.card.mini .mini-actions { display: flex; flex-direction: row; gap: 6px; }
+.card.mini .mini-actions .btn { white-space: nowrap; }
 .card.mini.warn { color: var(--warn); background: var(--warn-soft); border-color: transparent; }
 .row.static { padding: 10px 0; }
 .card .list .row { padding-left: 0; padding-right: 0; }

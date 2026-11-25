@@ -118,7 +118,7 @@ function CategoryForm({ initial, kind: k0, onClose }: { initial?: Category; kind
 
 const ACCOUNT_KINDS: { value: AccountKind; label: string }[] = [
   { value: 'banca', label: 'Conto bancario' }, { value: 'carta', label: 'Carta' }, { value: 'app', label: 'App di pagamento' },
-  { value: 'buoni', label: 'Buoni pasto' }, { value: 'contanti', label: 'Contanti' }
+  { value: 'buoni', label: 'Buoni pasto' }, { value: 'welfare', label: 'Buoni welfare' }, { value: 'contanti', label: 'Contanti' }
 ];
 
 export function Accounts() {
