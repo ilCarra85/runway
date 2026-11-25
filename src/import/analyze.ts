@@ -151,6 +151,8 @@ function suggest(row: BankRow, kind: Kind, key: string, state: AppState, holderW
   else if (/MUTUO/.test(hay)) r = pick('mutuo');
   else if (/GIROCONTO/.test(t) || (toSelf && /BONIFICO/.test(t)) || /SATISPAY/.test(hay)) r = pick(kind === 'uscita' ? 'giroconto-out' : 'giroconto-in');
   else if (/RIC\.?PREP/.test(hay)) r = pick(kind === 'uscita' ? 'giroconto-out' : 'giroconto-in');
+  // addebito mensile della carta di credito sul conto: le spese sono già nel conto della carta (estratto della carta)
+  else if (/CARTE DI CREDITO/.test(t) || /^ESTRATTO \d{2}\/\d{4} CARTA/.test(row.purpose ?? '')) r = pick(kind === 'uscita' ? 'giroconto-out' : 'giroconto-in');
   else if (/INPS|ASSEGNO UNICO/.test(hay) && kind === 'entrata') r = pick('assegno-unico');
   else if (kind === 'entrata' && /RIMBORSO 730|730/.test(hay)) r = pick('730');
   if (!r && kind === 'uscita') {

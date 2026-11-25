@@ -73,7 +73,8 @@ export const SEED_ACCOUNTS: Account[] = [
   { id: 'satispay', name: 'Satispay', icon: 'Smartphone', kind: 'app', order: 1, updatedAt: 1 },
   { id: 'buoni', name: 'Buoni pasto', icon: 'Wallet', kind: 'buoni', order: 2, updatedAt: 1 },
   { id: 'contanti', name: 'Contanti', icon: 'Banknote', kind: 'contanti', order: 3, updatedAt: 1 },
-  { id: 'welfare', name: 'Buoni welfare', icon: 'Gift', kind: 'welfare', order: 4, updatedAt: 1 }
+  { id: 'welfare', name: 'Buoni welfare', icon: 'Gift', kind: 'welfare', order: 4, updatedAt: 1 },
+  { id: 'carta-credito', name: 'Carta di credito', icon: 'CreditCard', kind: 'carta', order: 5, updatedAt: 1 }
 ];
 
 type R = [name: string, kind: Kind, amount: number, cat: string, every: number, unit: Unit, split?: Split];

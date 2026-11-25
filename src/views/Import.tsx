@@ -6,6 +6,7 @@ import { Badge } from '../components/Icon';
 import { Segmented, Toggle, groupCategories } from '../components/ui';
 import { pdfItems, pdfLines } from '../import/pdf';
 import { isUnicreditEc, parseUnicreditEc } from '../import/unicreditEc';
+import { isUnicreditCc, parseUnicreditCc } from '../import/unicreditCc';
 import { isUnicredit, parseUnicredit, type BankRow, type Statement } from '../import/unicredit';
 import { readXlsx } from '../import/xlsx';
 import { isSatispay, parseSatispay } from '../import/satispay';
@@ -68,8 +69,13 @@ export function Import({ onDone }: { onDone: () => void }) {
           else {
             // estratto conto periodico: i movimenti sono nelle prime pagine
             const items = await pdfItems(data.slice(0), 4);
-            if (!isUnicreditEc(items)) throw new Error(`"${f.name}" non sembra una lista movimenti o un estratto conto Unicredit, né un export Satispay.`);
-            st = parseUnicreditEc(items);
+            if (isUnicreditCc(items)) {
+              // carta di credito: i movimenti vanno nel conto della carta
+              const acc = state.accounts.find((a) => a.id === 'carta-credito' && !a.deleted)
+                ?? state.accounts.find((a) => a.kind === 'carta' && /credito/i.test(a.name) && !a.deleted);
+              st = parseUnicreditCc(items, acc?.id ?? 'carta-credito');
+            } else if (isUnicreditEc(items)) st = parseUnicreditEc(items);
+            else throw new Error(`"${f.name}" non sembra una lista movimenti, un estratto conto o un estratto della carta di credito Unicredit, né un export Satispay.`);
           }
         }
         const sum = st.rows.reduce((s, r) => s + r.amount, 0);
@@ -143,7 +149,7 @@ export function Import({ onDone }: { onDone: () => void }) {
       <div className="page">
         <section className="card">
           <h3 className="card-title"><FileUp size={18} /> Importa estratto conto</h3>
-          <p className="muted">Carica i PDF "Lista movimenti" o "Estratto conto" di Unicredit, o gli Excel "Esporta report" di Satispay (vanno nel conto Satispay). Il file viene letto
+          <p className="muted">Carica i PDF "Lista movimenti" o "Estratto conto" di Unicredit, gli estratti della carta di credito Unicredit (vanno nel conto Carta di credito), o gli Excel "Esporta report" di Satispay (vanno nel conto Satispay). Il file viene letto
             solo su questo dispositivo: non viene inviato a nessuno.</p>
           <ul className="muted small bullets">
             <li>i movimenti già presenti vengono riconosciuti e non duplicati (anche se reimporti lo stesso file);</li>
