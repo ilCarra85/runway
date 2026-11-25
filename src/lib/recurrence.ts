@@ -14,7 +14,9 @@ export function nthDate(r: Pick<Recurrence, 'start' | 'every' | 'unit'>, k: numb
 /** Date delle occorrenze in [from, to], escluse quelle saltate. */
 export function occurrencesBetween(r: Recurrence, from: string, to: string): string[] {
   const out: string[] = [];
-  for (let k = 0; k < 50000; k++) {
+  // data dal documento, nessun documento ancora confermato: nessuna scadenza
+  if (!r.start) return out;
+  for (let k = firstK(r); k < 50000; k++) {
     if (r.endMode === 'volte' && k >= (r.count ?? 0)) break;
     const d = nthDate(r, k);
     if (d > to) break;
@@ -30,7 +32,8 @@ export function isOccurrence(r: Recurrence, date: string): boolean {
 }
 
 export function nextOccurrence(r: Recurrence, fromInclusive: string): string | undefined {
-  for (let k = 0; k < 50000; k++) {
+  if (!r.start) return undefined;
+  for (let k = firstK(r); k < 50000; k++) {
     if (r.endMode === 'volte' && k >= (r.count ?? 0)) return undefined;
     const d = nthDate(r, k);
     if (r.endMode === 'data' && r.until && d > r.until) return undefined;
@@ -49,21 +52,29 @@ export function cadenceLabel(r: Pick<Recurrence, 'every' | 'unit' | 'endMode' | 
 }
 
 /**
- * Importo stimato di una ricorrenza: mediana degli ultimi 6 movimenti registrati
- * (la mediana non si fa spostare da una busta con premio o da una bolletta di conguaglio). 0 se non ce ne sono.
+ * Importo stimato di una ricorrenza: media dei movimenti registrati negli ultimi 12 mesi
+ * (contati dal più recente). 0 se non ce ne sono.
  */
 export function estimateAmount(recId: string, movements: Movement[], categoryId?: string): number {
-  const last = movements.filter((m) => !m.deleted && m.recurrenceId === recId && !m.planned && m.amount > 0 && (!categoryId || m.categoryId === categoryId))
-    .sort((a, b) => b.date.localeCompare(a.date)).slice(0, 6).map((m) => m.amount).sort((a, b) => a - b);
-  if (!last.length) return 0;
-  const mid = Math.floor(last.length / 2);
-  const v = last.length % 2 ? last[mid] : (last[mid - 1] + last[mid]) / 2;
-  return Math.round(v * 100) / 100;
+  const mine = movements.filter((m) => !m.deleted && m.recurrenceId === recId && !m.planned && m.amount > 0 && (!categoryId || m.categoryId === categoryId));
+  if (!mine.length) return 0;
+  const latest = mine.reduce((d, m) => (m.date > d ? m.date : d), '');
+  const from = addMonths(latest, -12);
+  const last = mine.filter((m) => m.date > from);
+  return Math.round(last.reduce((s, m) => s + m.amount, 0) / last.length * 100) / 100;
 }
 
+/**
+ * Data della ricorrenza lasciata vuota: le date le danno i documenti (serve una cartella monitorata).
+ * In questo caso `start` è la data dell'ultimo documento confermato (vuota finché non ce n'è uno):
+ * da lì si calcolano scadenze e previsioni.
+ */
+export const dateFromDoc = (r: Pick<Recurrence, 'docDate' | 'driveFolderId'>) => !!r.docDate && !!r.driveFolderId;
+
 /** Stato di rimborso dei movimenti generati dalla ricorrenza. */
-export function recRefund(r: Pick<Recurrence, 'kind' | 'refundable' | 'refundAmount'>): Pick<Movement, 'refund' | 'refundAmount'> {
-  return r.kind === 'uscita' && r.refundable ? { refund: 'pending', refundAmount: r.refundAmount } : { refund: 'none', refundAmount: undefined };
+export function recRefund(r: Pick<Recurrence, 'kind' | 'refundable' | 'refundAmount' | 'refundIn'>): Pick<Movement, 'refund' | 'refundAmount' | 'refundIn'> {
+  if (r.kind === 'entrata') return { refund: 'none', refundAmount: undefined, refundIn: r.refundIn || undefined };
+  return r.refundable ? { refund: 'pending', refundAmount: r.refundAmount } : { refund: 'none', refundAmount: undefined };
 }
 
 /** Quante volte all'anno ricorre (per stime rapide). */
@@ -75,4 +86,12 @@ export function timesPerYear(r: Pick<Recurrence, 'every' | 'unit'>): number {
     case 'mesi': return 12 / e;
     case 'anni': return 1 / e;
   }
+}
+
+/**
+ * Data dal documento: `start` è l'ultimo documento confermato, già registrato; le scadenze ripartono dalla successiva.
+ * (Il conteggio "dopo N volte" in questo caso parte dall'ultimo documento.)
+ */
+function firstK(r: Pick<Recurrence, 'docDate' | 'driveFolderId'>): number {
+  return dateFromDoc(r) ? 1 : 0;
 }

@@ -32,7 +32,7 @@ export function Recurrences() {
         <Badge icon={c?.icon ?? 'Repeat'} color={c?.color ?? '#64748b'} />
         <span className="row-main">
           <span className="row-title">{r.name}</span>
-          <span className="row-sub">{cadenceLabel(r)}{r.active && next ? ` · prossima ${formatDate(next)} (${relativeDays(next)})` : ''}</span>
+          <span className="row-sub">{cadenceLabel(r)}{r.active && next ? ` · prossima ${formatDate(next)} (${relativeDays(next)})` : ''}{r.docDate ? ' · data dal documento' : ''}</span>
           <span className="row-tags">
             <SplitBadge split={r.split} />
             {r.toVerify && <span className="tag tag-warn"><TriangleAlert size={12} /> Da verificare</span>}
@@ -120,7 +120,8 @@ function RecurrenceForm({ initial, onClose }: { initial?: Recurrence; onClose: (
   const [split, setSplit] = useState<Split>(initial?.split ?? { mode: 'pct', value: 100 });
   const [every, setEvery] = useState(String(initial?.every ?? 1));
   const [unit, setUnit] = useState<Unit>(initial?.unit ?? 'mesi');
-  const [start, setStart] = useState(initial?.start ?? todayISO());
+  // vuota (solo con cartella monitorata) = data presa dal documento
+  const [start, setStart] = useState(initial?.docDate ? '' : initial?.start ?? '');
   const [endMode, setEndMode] = useState<EndMode>(initial?.endMode ?? 'mai');
   const [count, setCount] = useState(String(initial?.count ?? 12));
   const [until, setUntil] = useState(initial?.until ?? '');
@@ -129,6 +130,7 @@ function RecurrenceForm({ initial, onClose }: { initial?: Recurrence; onClose: (
   const [notes, setNotes] = useState(initial?.notes ?? '');
   const [refundable, setRefundable] = useState(initial?.refundable ?? false);
   const [refundAmt, setRefundAmt] = useState(amountToInput(initial?.refundAmount));
+  const [refundIn, setRefundIn] = useState(initial?.refundIn ?? false);
   const [error, setError] = useState('');
   const value = parseAmount(amount);
   const refundValue = parseAmount(refundAmt);
@@ -149,6 +151,10 @@ function RecurrenceForm({ initial, onClose }: { initial?: Recurrence; onClose: (
       if (alsoMovements) {
         // documenti liberati (una nuova ricorrenza sulla stessa cartella li ripropone) e
         // uscite rimborsate da questi movimenti di nuovo "da rimborsare"
+        // rimborso 730 e premio registrati a parte dalla stessa busta (nota "Da <file>")
+        const docNotes = new Set(linked.filter((m) => m.docName).map((m) => `Da ${m.docName}`));
+        const extra = state.movements.filter((m) => !m.deleted && !m.recurrenceId && m.notes && docNotes.has(m.notes));
+        linked.push(...extra);
         const ids = new Set(linked.map((m) => m.id));
         const freed = state.movements.filter((m) => !m.deleted && !ids.has(m.id) && m.refundIncomeId && ids.has(m.refundIncomeId))
           .map((m) => ({ ...m, refund: 'pending' as const, refundIncomeId: undefined }));
@@ -170,6 +176,12 @@ function RecurrenceForm({ initial, onClose }: { initial?: Recurrence; onClose: (
     if (!auto && (!Number.isFinite(value) || value <= 0)) return setError(folder ? "Inserisci un importo maggiore di zero, oppure lascialo vuoto per stimarlo dai documenti" : "Inserisci un importo maggiore di zero");
     if (!categoryId) return setError('Scegli una categoria');
     if (endMode === 'data' && !until) return setError('Indica la data di fine');
+    if (!start && !folder) return setError('Indica la data (si può lasciare vuota solo con una cartella monitorata)');
+    // data vuota: la danno i documenti; la partenza di scadenze e previsioni è l'ultimo documento confermato
+    const docDate = !start && !!folder;
+    const lastDoc = initial ? state.movements.filter((m) => !m.deleted && !m.planned && m.recurrenceId === initial.id)
+      .reduce((d, m) => (m.date > d ? m.date : d), '') : '';
+    const startValue = docDate ? (initial?.docDate ? initial.start : lastDoc) : start;
     // Voce "da verificare" salvata ancora spenta: probabilmente l'utente vuole attivarla
     let isActive = active;
     if (!active && initial?.toVerify) {
@@ -180,7 +192,7 @@ function RecurrenceForm({ initial, onClose }: { initial?: Recurrence; onClose: (
     }
     const rec: Recurrence = {
       id: initial?.id ?? uid(), name: name.trim(), kind, amount: estimate, amountAuto: auto || undefined, categoryId, accountId, split,
-      every: draft.every, unit, start, endMode, count: endMode === 'volte' ? draft.count : undefined,
+      every: draft.every, unit, start: startValue, docDate: docDate || undefined, endMode, count: endMode === 'volte' ? draft.count : undefined,
       until: endMode === 'data' ? until : undefined, active: isActive, toVerify: initial?.toVerify && !isActive ? true : false, confirm: confirmFirst || undefined,
       skipped, driveFolderId: folder?.id, driveFolderName: folder?.name,
       docTemplate: folder ? docTemplate || undefined : undefined,
@@ -188,25 +200,15 @@ function RecurrenceForm({ initial, onClose }: { initial?: Recurrence; onClose: (
       docIgnored: initial?.docIgnored,
       refundable: kind === 'uscita' && refundable ? true : undefined,
       refundAmount: kind === 'uscita' && refundable ? refundAmount : undefined,
+      refundIn: kind === 'entrata' && refundIn ? true : undefined,
       notes: notes.trim() || undefined, updatedAt: Date.now()
     };
     upsert('recurrences', rec);
 
-    // rimborso attivato: anche i movimenti già registrati possono diventare "da rimborsare"
-    // (diventano rimborsati solo collegandoli all'entrata che li rimborsa)
-    const noRefund = initial && rec.refundable ? state.movements.filter((m) =>
-      !m.deleted && m.recurrenceId === rec.id && m.kind === 'uscita' && m.refund === 'none') : [];
-    if (noRefund.length) {
-      const n = noRefund.length;
-      const ok = await confirmDialog(
-        `${n === 1 ? 'C\'è 1 movimento già registrato' : `Ci sono ${n} movimenti già registrati`} di questa ricorrenza senza rimborso. ` +
-        `Segnarli come da rimborsare${refundAmount !== undefined ? ` (${money(refundAmount)} ciascuno)` : ''}?`,
-        { ok: 'Sì, da rimborsare', cancel: 'Lasciali così' });
-      if (ok) upsertMany('movements', noRefund.map((m) => ({ ...m, refund: 'pending' as const, refundAmount: rec.refundAmount, updatedAt: Date.now() })));
-    }
+    // «Rimborsabile» / «Contiene rimborso» valgono per i movimenti ancora da registrare: quelli registrati restano come sono
 
     // Movimenti già registrati che non cadono più su una data della ricorrenza (es. dopo la nuova fine)
-    const outside = initial ? state.movements.filter((m) =>
+    const outside = initial && !docDate ? state.movements.filter((m) =>
       !m.deleted && m.recurrenceId === rec.id && m.occurrence && !isOccurrence(rec, m.occurrence)) : [];
     if (outside.length) {
       const n = outside.length;
@@ -230,7 +232,7 @@ function RecurrenceForm({ initial, onClose }: { initial?: Recurrence; onClose: (
       <div className="row-2">
         <Field label="Nome"><input value={name} onChange={(e) => setName(e.target.value)} placeholder="es. Mutuo" /></Field>
         <Field label={folder ? 'Importo stimato' : 'Importo totale'}
-          hint={folder && !amount.trim() ? 'Vuoto: calcolato dai documenti confermati (mediana degli ultimi 6)' : undefined}>
+          hint={folder && !amount.trim() ? 'Vuoto: media dei documenti confermati negli ultimi 12 mesi' : undefined}>
           <AmountInput value={amount} onChange={setAmount}
             placeholder={folder ? (initial && estimateAmount(initial.id, state.movements, categoryId) ? 'Stimato ' + amountToInput(estimateAmount(initial.id, state.movements, categoryId)) : 'Dai documenti') : undefined} />
         </Field>
@@ -254,7 +256,9 @@ function RecurrenceForm({ initial, onClose }: { initial?: Recurrence; onClose: (
         </div>
       </Field>
       <div className="row-2">
-        <Field label="Prima volta il"><input type="date" value={start} onChange={(e) => setStart(e.target.value)} /></Field>
+        <Field label="Prima volta il" hint={folder ? (start ? 'La data dei movimenti è questa, non quella dei documenti' : 'Vuota: data presa dal documento') : undefined}>
+          <input type="date" value={start} onChange={(e) => setStart(e.target.value)} />
+        </Field>
         <Field label="Termina">
           <select value={endMode} onChange={(e) => setEndMode(e.target.value as EndMode)}>
             <option value="mai">Mai</option><option value="volte">Dopo N volte</option><option value="data">In una data</option>
@@ -275,6 +279,10 @@ function RecurrenceForm({ initial, onClose }: { initial?: Recurrence; onClose: (
         {kind === 'uscita' && (
           <Toggle checked={refundable} onChange={setRefundable} icon={<Briefcase size={20} />} label="Rimborsabile"
             hint="Ogni movimento nasce «da rimborsare»: la parte rimborsata non conta nelle tue spese" />
+        )}
+        {kind === 'entrata' && (
+          <Toggle checked={refundIn} onChange={setRefundIn} icon={<Briefcase size={20} />} label="Contiene rimborso"
+            hint="Ogni movimento può rimborsare uscite rimborsabili (es. rimborso spese in busta paga): le scegli sul movimento" />
         )}
         {kind === 'uscita' && refundable && (
           <Field label="Importo rimborsato ogni volta"

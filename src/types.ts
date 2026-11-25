@@ -63,6 +63,8 @@ export interface Movement extends Base {
   mealVouchers?: number;
   /** Entrata (busta paga) che ha incluso il rimborso. */
   refundIncomeId?: string;
+  /** Entrata che contiene rimborsi di uscite rimborsabili (es. busta paga con rimborso spese). */
+  refundIn?: boolean;
   /** Periodo di competenza (es. bolletta bimestrale): l'importo viene spalmato sui giorni. */
   compFrom?: string;
   compTo?: string;
@@ -102,6 +104,10 @@ export interface Recurrence extends Base {
   refundable?: boolean;
   /** Parte rimborsata di ogni occorrenza; assente = tutto l'importo. */
   refundAmount?: number;
+  /** Data lasciata vuota (solo con cartella monitorata): la data dei movimenti è quella del documento. */
+  docDate?: boolean;
+  /** Entrata: ogni movimento nasce con «Contiene rimborso». */
+  refundIn?: boolean;
   /** Occorrenze saltate (date ISO). */
   skipped: string[];
   /** Cartella Google Drive monitorata per questa voce. */

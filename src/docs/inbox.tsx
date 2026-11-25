@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import { useStore } from '../data/store';
 import { alive, fitsKind } from '../lib/stats';
 import { uid } from '../lib/format';
-import { estimateAmount } from '../lib/recurrence';
+import { dateFromDoc, estimateAmount } from '../lib/recurrence';
 import type { Movement } from '../types';
 import { AuthError, hasValidToken } from '../sync/google';
 import { confirmMovement, scanRecurrence, type DocRefund, type Proposal } from './scan';
@@ -25,6 +25,8 @@ interface Inbox {
 export interface DocChoice {
   /** Rimborso dell'uscita (assente = quello della ricorrenza). */
   refund?: DocRefund;
+  /** Entrata (busta paga): «Contiene rimborso». */
+  refundIn?: boolean;
   /** Entrata (busta paga): uscite "da rimborsare" che rimborsa. */
   links?: string[];
   /** Entrata (busta paga): buoni pasto da registrare nel conto Buoni pasto. */
@@ -89,6 +91,7 @@ export function DocInboxProvider({ children }: { children: ReactNode }) {
     const m = confirmMovement(p, amount, rec, st, date, c?.refund);
     const out: Movement[] = [m];
     const now = Date.now();
+    if (m.kind === 'entrata' && c?.refundIn !== undefined) m.refundIn = c.refundIn || undefined;
     if (c?.r730 && c.r730 > 0 && c.r730 < m.amount) {
       // lo stipendio resta senza il 730 (così la media è quella vera); il 730 è un'entrata a sé
       m.amount = Math.round((m.amount - c.r730) * 100) / 100;
@@ -109,7 +112,7 @@ export function DocInboxProvider({ children }: { children: ReactNode }) {
         notes: `Da ${p.file.name}`, createdAt: now, updatedAt: now
       });
     }
-    for (const id of c?.links ?? []) {
+    for (const id of c?.refundIn === false ? [] : c?.links ?? []) {
       const u = st.movements.find((x) => x.id === id && !x.deleted && x.refund === 'pending');
       if (u) out.push({ ...u, refund: 'reimbursed', refundIncomeId: m.id, updatedAt: now });
     }
@@ -118,13 +121,19 @@ export function DocInboxProvider({ children }: { children: ReactNode }) {
     return out;
   };
 
-  // ricorrenze con importo stimato: la stima si aggiorna con i nuovi documenti confermati
+  // dopo la conferma: si aggiornano l'importo stimato (media 12 mesi) e, per le ricorrenze con la data dal
+  // documento, la data di partenza (l'ultimo documento confermato), da cui si calcolano scadenze e previsioni
   const reestimate = (ms: Movement[]) => {
     const st = stateRef.current;
     const ids = new Set(ms.map((m) => m.recurrenceId).filter(Boolean));
     const all = [...st.movements.filter((m) => !ms.some((x) => x.id === m.id)), ...ms];
-    const recs = st.recurrences.filter((r) => ids.has(r.id) && r.amountAuto && !r.deleted)
-      .map((r) => ({ ...r, amount: estimateAmount(r.id, all, r.categoryId) || r.amount, updatedAt: Date.now() }));
+    const recs = st.recurrences.filter((r) => ids.has(r.id) && !r.deleted && (r.amountAuto || dateFromDoc(r))).map((r) => {
+      const amount = r.amountAuto ? estimateAmount(r.id, all, r.categoryId) || r.amount : r.amount;
+      const start = dateFromDoc(r)
+        ? all.filter((m) => !m.deleted && !m.planned && m.recurrenceId === r.id && m.occurrence).reduce((d, m) => (m.date > d ? m.date : d), r.start)
+        : r.start;
+      return { ...r, amount, start, updatedAt: Date.now() };
+    });
     if (recs.length) upsertMany('recurrences', recs);
   };
 
@@ -136,8 +145,8 @@ export function DocInboxProvider({ children }: { children: ReactNode }) {
       drop([p.file.id + p.recId]);
     },
     confirmAll(list, choiceFor) {
-      // solo i documenti riconosciuti: quelli senza importo letto vanno confermati uno per uno
-      const ok = list.filter((p) => p.parsed);
+      // solo i documenti riconosciuti e con una data: gli altri vanno completati e confermati uno per uno
+      const ok = list.filter((p) => p.parsed && p.date);
       const ms = ok.flatMap((p) => build(p, p.parsed!.amount, undefined, choiceFor?.(p)));
       if (ms.length) { upsertMany('movements', ms); reestimate(ms); }
       drop(ok.map((p) => p.file.id + p.recId));

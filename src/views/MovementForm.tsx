@@ -51,14 +51,14 @@ export function MovementForm({ initial, onClose }: { initial?: MovementDraft; on
   const [linked, setLinked] = useState<Set<string>>(
     () => new Set(state.movements.filter((m) => !m.deleted && m.refundIncomeId && m.refundIncomeId === initial?.id).map((m) => m.id))
   );
-  const [linkRefunds, setLinkRefunds] = useState(linked.size > 0);
+  // entrata: «Contiene rimborso» (dalla ricorrenza o dal movimento) e uscite che rimborsa
+  const [linkRefunds, setLinkRefunds] = useState(!!initial?.refundIn || linked.size > 0);
   const linkedTotal = refundsAvailable.filter((m) => linked.has(m.id)).reduce((s, m) => s + refundOf(m), 0);
-  // nuova occorrenza di una ricorrenza con cartella monitorata (es. busta paga): i rimborsi si collegano
-  // confermando il documento, non qui. Resta possibile correggerli modificando il movimento salvato.
-  const fromMonitored = !editing && !!initial?.recurrenceId &&
-    !!state.recurrences.find((r) => r.id === initial.recurrenceId && !r.deleted)?.driveFolderId;
-  // entrata che ha rimborsato questa uscita
-  const refundIncome = initial?.refundIncomeId ? state.movements.find((m) => m.id === initial.refundIncomeId && !m.deleted) : undefined;
+  // uscita: entrata che la rimborsa, scelta tra quelle con «Contiene rimborso» (vuoto = ancora da rimborsare)
+  const [incomeId, setIncomeId] = useState(initial?.refundIncomeId && incomeOf.has(initial.refundIncomeId) ? initial.refundIncomeId : '');
+  const refundIncomes = useMemo(() => [...incomeOf.values()]
+    .filter((m) => m.refundIn || m.id === incomeId || state.movements.some((x) => !x.deleted && x.refundIncomeId === m.id))
+    .sort((a, b) => b.date.localeCompare(a.date)), [incomeOf, incomeId, state.movements]);
 
   const usage = useMemo(() => categoryUsage(state.movements), [state.movements]);
   const value = parseAmount(amount);
@@ -99,9 +99,10 @@ export function MovementForm({ initial, onClose }: { initial?: MovementDraft; on
       importId: initial?.importId, docFileId: initial?.docFileId, docName: initial?.docName, mealVouchers: initial?.mealVouchers,
       id, kind, amount: value, categoryId, accountId, date,
       description: description.trim() || cat?.name || '',
-      split, refund: kind === 'uscita' ? refund : 'none',
+      split, refund: kind === 'uscita' && refund !== 'none' ? (incomeId ? 'reimbursed' : 'pending') : 'none',
       refundAmount: kind === 'uscita' && refund !== 'none' ? refundAmount : undefined,
-      refundIncomeId: kind === 'uscita' && refund === 'reimbursed' ? initial?.refundIncomeId : undefined,
+      refundIncomeId: kind === 'uscita' && refund !== 'none' && incomeId ? incomeId : undefined,
+      refundIn: kind === 'entrata' && linkRefunds ? true : undefined,
       compFrom: comp ? compFrom + '-01' : undefined,
       compTo: comp ? endOfMonth(compTo + '-01') : undefined,
       planned, recurrenceId: initial?.recurrenceId, occurrence: initial?.occurrence,
@@ -169,9 +170,19 @@ export function MovementForm({ initial, onClose }: { initial?: MovementDraft; on
         {kind === 'uscita' && (
           <Toggle checked={refund !== 'none'} onChange={(v) => setRefund(v ? (refund === 'reimbursed' ? 'reimbursed' : 'pending') : 'none')}
             icon={<Briefcase size={20} />} label="Rimborsabile"
-            hint={refund === 'reimbursed'
-              ? `Rimborsata${refundIncome ? ` con «${refundIncome.description}» del ${formatDate(refundIncome.date)}` : ''}`
-              : "La parte rimborsata non conta nelle tue spese. Resta da rimborsare finché non la colleghi all'entrata che la rimborsa"} />
+            hint={refund === 'none' ? 'Nessun rimborso'
+              : incomeId ? 'Rimborsata: la parte rimborsata non conta nelle tue spese'
+              : "Da rimborsare: scegli l'entrata che la rimborsa quando arriva"} />
+        )}
+        {kind === 'uscita' && refund !== 'none' && (
+          <Field label="Rimborsata da" hint={!refundIncomes.some((m) => m.date >= date) && !incomeId ? 'Nessuna entrata con «Contiene rimborso» da questa data in poi' : undefined}>
+            <select value={incomeId} onChange={(e) => setIncomeId(e.target.value)}>
+              <option value="">Non ancora rimborsata</option>
+              {refundIncomes.filter((m) => m.date >= date || m.id === incomeId).map((m) => (
+                <option key={m.id} value={m.id}>{m.description} · {formatDate(m.date)} · {money(m.amount)}</option>
+              ))}
+            </select>
+          </Field>
         )}
         {kind === 'uscita' && refund !== 'none' && (
           <Field label="Importo rimborsato"
@@ -197,9 +208,9 @@ export function MovementForm({ initial, onClose }: { initial?: MovementDraft; on
         </div>
       )}
 
-      {kind === 'entrata' && !fromMonitored && refundsAvailable.length > 0 && (
+      {kind === 'entrata' && (
         <div className="toggles">
-          <Toggle checked={linkRefunds} onChange={setLinkRefunds} icon={<Briefcase size={20} />} label="Rimborsato"
+          <Toggle checked={linkRefunds} onChange={setLinkRefunds} icon={<Briefcase size={20} />} label="Contiene rimborso"
             hint={linkRefunds
               ? (linkedTotal > 0 ? `${money(linkedTotal)} di rimborsi (${linked.size}): non contano come reddito` : 'Aggiungi le uscite rimborsate da questa entrata')
               : `${refundsAvailable.filter((m) => m.refund === 'pending' && m.date <= date).length} uscite da rimborsare`} />

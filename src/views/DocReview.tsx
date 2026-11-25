@@ -28,7 +28,7 @@ export function DocReview({ onClose }: { onClose: () => void }) {
   const [links, setLinks] = useState<Record<string, string[]>>({});
   const [r730s, setR730s] = useState<Record<string, R730Sel>>({});
   const [bonuses, setBonuses] = useState<Record<string, BonusSel>>({});
-  const recognized = inbox.proposals.filter((p) => p.parsed);
+  const recognized = inbox.proposals.filter((p) => p.parsed && p.date);
   const key = (p: Proposal) => p.file.id + p.recId;
 
   const recs = new Map(state.recurrences.map((r) => [r.id, r]));
@@ -55,6 +55,9 @@ export function DocReview({ onClose }: { onClose: () => void }) {
     .sort((a, b) => a.date.localeCompare(b.date)), [state.movements]);
   // nessun collegamento automatico: le uscite rimborsate le sceglie l'utente
   const linksOf = (p: Proposal) => links[key(p)] ?? [];
+  // «Contiene rimborso»: dalla ricorrenza, o acceso se la busta riporta un rimborso spese
+  const [refundIns, setRefundIns] = useState<Record<string, boolean>>({});
+  const refundInOf = (p: Proposal) => refundIns[key(p)] ?? (!!recs.get(p.recId)?.refundIn || (p.parsed?.refundExpenses ?? 0) > 0);
   const r730Of = (p: Proposal): R730Sel => r730s[key(p)] ?? { on: !!p.parsed?.refund730, amt: amountToInput(p.parsed?.refund730) };
   const r730Value = (p: Proposal) => { const x = r730Of(p), v = parseAmount(x.amt); return x.on && Number.isFinite(v) && v > 0 ? v : undefined; };
   const bonusOf = (p: Proposal): BonusSel => bonuses[key(p)] ?? { on: !!p.parsed?.bonus, amt: amountToInput(p.parsed?.bonus) };
@@ -62,7 +65,7 @@ export function DocReview({ onClose }: { onClose: () => void }) {
   const choice = (p: Proposal, amount: number): DocChoice => {
     const r = recs.get(p.recId);
     if (r?.kind === 'uscita') return { refund: docRefund(p, amount) };
-    return { links: linksOf(p), meal: p.parsed?.mealVouchers, r730: r730Value(p), bonus: bonusValue(p) };
+    return { refundIn: refundInOf(p), links: linksOf(p), meal: p.parsed?.mealVouchers, r730: r730Value(p), bonus: bonusValue(p) };
   };
   const cats = new Map(state.categories.map((c) => [c.id, c]));
   const supplyLabel = (p: Proposal) => {
@@ -139,9 +142,12 @@ export function DocReview({ onClose }: { onClose: () => void }) {
                 const salary = Number.isFinite(amount) ? Math.max(0, amount - (v7 ?? 0) - (vb ?? 0)) : NaN;
                 const setSel = (ids: string[]) => setLinks({ ...links, [key(p)]: ids });
                 return (<>
-                  {(read > 0 || sel.length > 0 || cands.length > 0) && (
+                  <div className="doc-refund">
+                    <Toggle checked={refundInOf(p)} onChange={(v) => setRefundIns({ ...refundIns, [key(p)]: v })} icon={<Briefcase size={20} />} label="Contiene rimborso"
+                      hint={read > 0 ? `Rimborso spese in busta: ${money(read)}` : 'Rimborsa uscite rimborsabili'} />
+                  </div>
+                  {refundInOf(p) && (
                     <div className="doc-links">
-                      <p className="doc-links-head"><Briefcase size={14} /><span>{read > 0 ? <>Rimborsato in busta <strong>{money(read)}</strong></> : 'Uscite rimborsate'}</span></p>
                       <RefundLinks selected={sel} candidates={cands} categories={state.categories} target={read > 0 ? read : undefined} near={date} onChange={setSel} />
                     </div>
                   )}
@@ -176,6 +182,7 @@ export function DocReview({ onClose }: { onClose: () => void }) {
               )}
               {!p.parsed && p.locked && <p className="muted small">Il file è protetto da password e non si può leggere. Aprilo con l'anteprima (ti chiede la password) e inserisci importo e data, oppure scartalo.</p>}
               {!p.parsed && !p.locked && <p className="muted small">Il modello non ha letto questo file (scansione, sollecito, contratto…). Guarda l'anteprima e inserisci importo e data, oppure scartalo.</p>}
+              {!date && <p className="warn-text small">Data non trovata nel documento: inseriscila per confermare.</p>}
               {changed && <p className="muted small">Hai corretto l'importo letto ({money(p.parsed!.amount)}).</p>}
               <div className="doc-actions">
                 <button className="btn small ghost" onClick={() => setPreview(p)}><Eye size={16} /> Anteprima</button>

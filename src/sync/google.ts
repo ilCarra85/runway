@@ -21,16 +21,16 @@ export const TABS: Record<Collection, string> = {
 
 const COLUMNS: Record<Collection, string[]> = {
   movements: ['id', 'date', 'kind', 'amount', 'categoryId', 'accountId', 'description', 'splitMode', 'splitValue', 'refund',
-    'refundIncomeId', 'compFrom', 'compTo', 'planned', 'recurrenceId', 'occurrence', 'notes', 'demo', 'createdAt', 'updatedAt', 'deleted', 'refundAmount', 'importId', 'docFileId', 'docName', 'mealVouchers'],
+    'refundIncomeId', 'compFrom', 'compTo', 'planned', 'recurrenceId', 'occurrence', 'notes', 'demo', 'createdAt', 'updatedAt', 'deleted', 'refundAmount', 'importId', 'docFileId', 'docName', 'mealVouchers', 'refundIn'],
   categories: ['id', 'name', 'icon', 'color', 'kind', 'group', 'splitMode', 'splitValue', 'order', 'excluded', 'updatedAt', 'deleted'],
   accounts: ['id', 'name', 'icon', 'kind', 'order', 'updatedAt', 'deleted', 'checkDate', 'checkBalance', 'voucherValue'],
   recurrences: ['id', 'name', 'kind', 'amount', 'categoryId', 'accountId', 'splitMode', 'splitValue', 'every', 'unit', 'start', 'endMode',
-    'count', 'until', 'active', 'toVerify', 'skipped', 'driveFolderId', 'driveFolderName', 'notes', 'updatedAt', 'deleted', 'confirm', 'docTemplate', 'docSupply', 'docIgnored', 'refundable', 'refundAmount', 'amountAuto'],
+    'count', 'until', 'active', 'toVerify', 'skipped', 'driveFolderId', 'driveFolderName', 'notes', 'updatedAt', 'deleted', 'confirm', 'docTemplate', 'docSupply', 'docIgnored', 'refundable', 'refundAmount', 'amountAuto', 'refundIn', 'docDate'],
   rules: ['id', 'key', 'kind', 'categoryId', 'splitMode', 'splitValue', 'updatedAt', 'deleted']
 };
 
 const NUM = new Set(['amount', 'refundAmount', 'splitValue', 'order', 'every', 'count', 'createdAt', 'updatedAt', 'mealVouchers', 'checkBalance', 'voucherValue']);
-const BOOL = new Set(['planned', 'demo', 'deleted', 'excluded', 'active', 'toVerify', 'confirm', 'refundable', 'amountAuto']);
+const BOOL = new Set(['planned', 'demo', 'deleted', 'excluded', 'active', 'toVerify', 'confirm', 'refundable', 'amountAuto', 'refundIn', 'docDate']);
 const JSONF = new Set(['skipped', 'docIgnored']);
 
 // ---------- Token ----------

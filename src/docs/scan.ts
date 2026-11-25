@@ -6,7 +6,7 @@ import { listFolderPdfs, downloadFile, type DriveFile } from '../sync/drive';
 import { pdfLines, lineText } from '../import/pdf';
 import { detectTemplate, separateSupply, templateById, TEMPLATES_VERSION, type ParsedDoc } from './templates';
 import { cadenceDays, nearestOccurrence } from '../import/analyze';
-import { occurrencesBetween, recRefund } from '../lib/recurrence';
+import { dateFromDoc, occurrencesBetween, recRefund } from '../lib/recurrence';
 import { idbGet, idbSet } from '../data/idb';
 import { alive } from '../lib/stats';
 import { addDays, daysBetween, todayISO } from '../lib/dates';
@@ -22,7 +22,10 @@ export interface Proposal {
   file: DriveFile;
   /** Dati letti dal modello; null = documento non riconosciuto (scansione, sollecito…): importo da inserire a mano. */
   parsed: ParsedDoc | null;
-  /** Data del movimento: scadenza del pagamento, altrimenti data della fattura. */
+  /**
+   * Data del movimento: quella della ricorrenza se fissata, altrimenti scadenza o data del documento.
+   * Vuota = non trovata: la inserisce l'utente.
+   */
   date: string;
   occurrence?: string;
   /** Movimento già esistente da completare (generato dalla ricorrenza o importato dalla banca). */
@@ -91,26 +94,32 @@ export async function scanRecurrence(rec: Recurrence, state: AppState, onProgres
   const occupied = new Set(alive(state.movements).filter((m) => m.recurrenceId === rec.id && m.occurrence).map((m) => m.occurrence!));
   const cad = cadenceDays(rec.every, rec.unit);
   const out: Proposal[] = [];
-  const dateOf = (x: { file: DriveFile; parsed: ParsedDoc | null }) =>
-    x.parsed?.dueDate ?? x.parsed?.issueDate ?? dateFromName(x.file.name) ?? x.file.modifiedTime.slice(0, 10);
+  // data letta dal documento (scadenza, emissione o data nel nome); se manca la inserisce l'utente
+  const docDateOf = (x: { file: DriveFile; parsed: ParsedDoc | null }) =>
+    x.parsed?.dueDate ?? x.parsed?.issueDate ?? dateFromName(x.file.name);
+  const sortKey = (x: typeof found[0]) => docDateOf(x) ?? x.file.modifiedTime.slice(0, 10);
   // prima i documenti riconosciuti, poi gli altri: un sollecito o una voltura non devono
   // occupare la scadenza della bolletta vera
-  const byDate = (a: typeof found[0], b: typeof found[0]) => dateOf(a).localeCompare(dateOf(b));
+  const byDate = (a: typeof found[0], b: typeof found[0]) => sortKey(a).localeCompare(sortKey(b));
   const ordered = [...found.filter((x) => x.parsed).sort(byDate), ...found.filter((x) => !x.parsed).sort(byDate)];
-  // i documenti di prima dell'inizio della ricorrenza non vengono proposti (es. buste paga vecchie)
-  const notBefore = addDays(rec.start, -Math.round(cad * 0.5));
+  const fromDoc = dateFromDoc(rec);
+  // data fissa: i documenti di prima dell'inizio della ricorrenza non vengono proposti (es. buste paga vecchie)
+  const notBefore = !fromDoc && rec.start ? addDays(rec.start, -Math.round(cad * 0.5)) : '';
   for (const x of ordered) {
     const { file, parsed, locked } = x;
-    const date = dateOf(x);
-    if (date < notBefore) continue;
+    const docDate = docDateOf(x);
+    if (docDate && docDate < notBefore) continue;
     // es. tredicesima: movimento a parte, non occupa la scadenza mensile
-    if (separateSupply(rec.docTemplate, parsed?.supply)) { out.push({ recId: rec.id, file, parsed, date }); continue; }
-    // la prima scadenza libera in una finestra intorno alla data (una bolletta pagata in ritardo
-    // non "ruba" la scadenza della successiva)
-    const occurrence = occurrencesBetween({ ...rec, skipped: [] }, addDays(date, -Math.round(cad * 0.75)), addDays(date, Math.round(cad * 0.6)))
-      .find((d) => !occupied.has(d));
+    if (separateSupply(rec.docTemplate, parsed?.supply)) { out.push({ recId: rec.id, file, parsed, date: docDate ?? '' }); continue; }
+    // data fissa: la prima scadenza libera in una finestra intorno alla data del documento (una bolletta
+    // pagata in ritardo non "ruba" la scadenza della successiva); data dal documento: nessuna scadenza
+    const occurrence = fromDoc || !docDate ? undefined
+      : occurrencesBetween({ ...rec, skipped: [] }, addDays(docDate, -Math.round(cad * 0.75)), addDays(docDate, Math.round(cad * 0.6)))
+        .find((d) => !occupied.has(d));
     if (occurrence) occupied.add(occurrence);
-    const near = (m: Movement, days: number) => Math.abs(daysBetween(m.date, date)) <= days;
+    // data del movimento: quella della ricorrenza se fissata, altrimenti quella del documento
+    const date = occurrence ?? docDate ?? '';
+    const near = (m: Movement, days: number) => !!docDate && Math.abs(daysBetween(m.date, docDate)) <= days;
     // un documento non riconosciuto non viene abbinato: l'importo non è noto
     const match = !parsed ? undefined :
       live.find((m) => !used.has(m.id) && m.recurrenceId === rec.id && ((occurrence && m.occurrence === occurrence) || near(m, 10))) ??
@@ -118,7 +127,8 @@ export async function scanRecurrence(rec: Recurrence, state: AppState, onProgres
     if (match) used.add(match.id);
     // il movimento abbinato ha già la sua scadenza: quella calcolata torna libera
     if (match?.occurrence && occurrence && occurrence !== match.occurrence) occupied.delete(occurrence);
-    out.push({ recId: rec.id, file, parsed, date, occurrence: match?.occurrence ?? occurrence, match, locked });
+    const occ = match?.occurrence ?? occurrence;
+    out.push({ recId: rec.id, file, parsed, date: !fromDoc && occ ? occ : date, occurrence: occ, match, locked });
   }
   return out.sort((a, b) => a.date.localeCompare(b.date));
 }
@@ -134,8 +144,9 @@ export function confirmMovement(p: Proposal, amount: number, rec: Recurrence, st
     compFrom: p.parsed?.periodFrom, compTo: p.parsed?.periodTo
   };
   const date = dateOverride || p.date;
+  // data dal documento: la scadenza è la data stessa (da lì ripartono scadenze e previsioni);
   // data cambiata a mano: la scadenza della ricorrenza va ricalcolata
-  const occ = date === p.date ? p.occurrence : nearestOccurrence(rec, date);
+  const occ = dateFromDoc(rec) ? date : date === p.date ? p.occurrence : nearestOccurrence(rec, date);
   if (p.match) {
     // movimento della banca: data e importo reali restano; altrimenti si usano quelli della bolletta
     const fromBank = !!p.match.importId;
