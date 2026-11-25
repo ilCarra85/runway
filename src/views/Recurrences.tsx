@@ -146,7 +146,17 @@ function RecurrenceForm({ initial, onClose }: { initial?: Recurrence; onClose: (
       const alsoMovements = await confirmDialog(
         `${n === 1 ? 'C\'è 1 movimento già registrato' : `Ci sono ${n} movimenti già registrati`} da questa ricorrenza (${money(total)}). Vuoi eliminare anche ${n === 1 ? 'quello' : 'quelli'}?`,
         { ok: n === 1 ? 'Elimina anche il movimento' : 'Elimina anche i movimenti', cancel: 'Mantienili', danger: true });
-      if (alsoMovements) upsertMany('movements', linked.map((m) => ({ ...m, deleted: true })));
+      if (alsoMovements) {
+        // documenti liberati (una nuova ricorrenza sulla stessa cartella li ripropone) e
+        // uscite rimborsate da questi movimenti di nuovo "da rimborsare"
+        const ids = new Set(linked.map((m) => m.id));
+        const freed = state.movements.filter((m) => !m.deleted && !ids.has(m.id) && m.refundIncomeId && ids.has(m.refundIncomeId))
+          .map((m) => ({ ...m, refund: 'pending' as const, refundIncomeId: undefined }));
+        upsertMany('movements', [
+          ...linked.map((m) => ({ ...m, deleted: true, docFileId: undefined, docName: undefined })),
+          ...freed
+        ]);
+      }
     }
     remove('recurrences', initial.id);
     onClose();

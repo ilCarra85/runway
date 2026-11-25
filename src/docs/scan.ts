@@ -31,10 +31,18 @@ export interface Proposal {
   locked?: boolean;
 }
 
-/** File già gestiti: collegati a un movimento (anche eliminato) o scartati dall'utente. */
+/**
+ * File già gestiti: collegati a un movimento o scartati dall'utente. Un movimento eliminato a mano tiene il suo
+ * documento (non si ripropone); se però è stata eliminata la sua ricorrenza, il documento torna libero.
+ */
 function handledFiles(state: AppState, rec: Recurrence): Set<string> {
   const s = new Set(rec.docIgnored ?? []);
-  for (const m of state.movements) if (m.docFileId) s.add(m.docFileId);
+  const liveRecs = new Set(state.recurrences.filter((r) => !r.deleted).map((r) => r.id));
+  for (const m of state.movements) {
+    if (!m.docFileId) continue;
+    if (m.deleted && (!m.recurrenceId || !liveRecs.has(m.recurrenceId))) continue;
+    s.add(m.docFileId);
+  }
   return s;
 }
 
