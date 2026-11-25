@@ -108,12 +108,14 @@ export function Import({ onDone }: { onDone: () => void }) {
     }
     return [...m.entries()].map(([g, items]) => {
       const categoryId = d.groupCat.get(g) ?? items[0].categoryId;
+      // addebiti di una ricorrenza proposta importati come "Movimenti singoli": da rivedere (categoria da confermare)
+      const fromRec = items.some((i) => i.recId && d.recChoice.get(i.recId) === 'singoli');
       // "da rivedere" in base alla proposta iniziale: il gruppo resta in elenco anche dopo la scelta
-      return { g, items: items.sort((a, b) => b.row.date.localeCompare(a.row.date)), categoryId,
-        review: /^altro-/.test(items[0].categoryId), decided: d.groupCat.has(g),
+      return { g, items: items.sort((a, b) => b.row.date.localeCompare(a.row.date)), categoryId, fromRec,
+        review: fromRec || /^altro-/.test(items[0].categoryId), decided: d.groupCat.has(g),
         later: items.every((i) => d.later.has(i.row.bankId)) };
-    }).sort((a, b) => b.items.length - a.items.length || a.items[0].name.localeCompare(b.items[0].name));
-  }, [plan, inRecCard, d.groupCat, d.later]);
+    }).sort((a, b) => Number(b.fromRec) - Number(a.fromRec) || b.items.length - a.items.length || a.items[0].name.localeCompare(b.items[0].name));
+  }, [plan, inRecCard, d.groupCat, d.later, d.recChoice]);
 
   if (result) {
     return (
@@ -244,7 +246,7 @@ export function Import({ onDone }: { onDone: () => void }) {
                     ]} />
                   {p.choice === 'escludi' && <p className="muted small">Questi {p.items.length} addebiti non verranno importati.</p>}
                   {p.choice === 'dopo' && <p className="muted small">Questi {p.items.length} addebiti vengono importati come movimenti da confermare: li ritrovi in Home, in «Movimenti da confermare».</p>}
-                  {p.choice === 'singoli' && <p className="muted small">Gli addebiti compaiono tra i movimenti qui sotto, nel gruppo «{p0.name}».</p>}
+                  {p.choice === 'singoli' && <p className="muted small">Gli addebiti compaiono qui sotto in «Movimenti», in cima a «Da rivedere»: lì puoi cambiare la categoria prima di importarli.</p>}
                   {p.accepted && <>
                     <div className="imp-controls">
                       <CategorySelect kind={p.kind} value={p.categoryId} categories={state.categories} onChange={(v) => edit({ categoryId: v })} />
@@ -301,7 +303,7 @@ export function Import({ onDone }: { onDone: () => void }) {
             )}
             {list.length === 0 && <p className="muted small">Niente da rivedere.</p>}
             <div className="imp-groups">
-              {list.slice(0, shown).map(({ g, items: its, categoryId, decided }) => {
+              {list.slice(0, shown).map(({ g, items: its, categoryId, decided, fromRec }) => {
                 const c = cats.get(categoryId);
                 const kind = its[0].kind;
                 const included = its.filter((i) => !d.skip.has(i.row.bankId));
@@ -316,7 +318,7 @@ export function Import({ onDone }: { onDone: () => void }) {
                       <Badge icon={c?.icon ?? 'CircleHelp'} color={c?.color ?? '#64748b'} size={34} />
                       <button className="imp-gname" onClick={() => toggleOpen(k)}>
                         <span>{decided && <CheckCircle2 size={14} className="pos" />} {its[0].name}</span>
-                        <small>{its.length} {its.length === 1 ? 'movimento' : 'movimenti'} · {its[0].row.type.toLowerCase()}</small>
+                        <small>{its.length} {its.length === 1 ? 'movimento' : 'movimenti'} · {fromRec ? 'dalla ricorrenza proposta' : its[0].row.type.toLowerCase()}</small>
                       </button>
                       <strong className={kind === 'entrata' ? 'pos' : ''}>{money(total)}</strong>
                     </div>
