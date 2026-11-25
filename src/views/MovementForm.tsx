@@ -135,10 +135,11 @@ export function MovementForm({ initial, onClose }: { initial?: MovementDraft; on
   };
 
   return (
-    <Sheet title={editing ? 'Modifica movimento' : initial?.recurrenceId ? 'Registra ricorrenza' : 'Nuovo movimento'} onClose={onClose}
+    <Sheet title={initial?.toConfirm ? 'Registra movimento' : editing ? 'Modifica movimento' : initial?.recurrenceId ? 'Registra ricorrenza' : 'Nuovo movimento'} onClose={onClose}
       footer={<>
         {editing && <button className="btn ghost danger" onClick={del}><Trash2 size={18} /> Elimina</button>}
-        <button className="btn primary grow" onClick={save}>Salva</button>
+        {/* da confermare: salvando diventa un movimento normale (toConfirm non viene riportato) */}
+        <button className="btn primary grow" onClick={save}>{initial?.toConfirm ? 'Registra' : 'Salva'}</button>
       </>}>
       <Segmented<Kind> className={`kind-switch ${kind}`} value={kind} onChange={changeKind} options={[
         { value: 'uscita', label: 'Uscita' }, { value: 'entrata', label: 'Entrata' }

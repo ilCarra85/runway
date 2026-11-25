@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Briefcase, ChevronLeft, ChevronRight, Clock, Search, CalendarRange, Repeat } from 'lucide-react';
+import { Briefcase, ChevronLeft, ChevronRight, Clock, ListChecks, Search, CalendarRange, Repeat } from 'lucide-react';
 import type { Movement } from '../types';
 import { useStore } from '../data/store';
 import { Badge, Icon } from '../components/Icon';
@@ -8,7 +8,7 @@ import { addMonths, dayHeader, endOfMonth, monthLabel, startOfMonth, todayISO } 
 import { money } from '../lib/format';
 import { VIRTUAL_PREFIX, effectiveMine, makeCtx, myShare, refundOf, upcomingMovements } from '../lib/stats';
 
-type KindFilter = 'tutti' | 'uscita' | 'entrata' | 'previsti' | 'rimborsi';
+type KindFilter = 'tutti' | 'uscita' | 'entrata' | 'previsti' | 'rimborsi' | 'confermare';
 
 export function Movements({ onEdit }: { onEdit: (m: Movement) => void }) {
   const { state } = useStore();
@@ -27,7 +27,7 @@ export function Movements({ onEdit }: { onEdit: (m: Movement) => void }) {
     return [...state.movements, ...upcoming]
       .filter((m) => !m.deleted)
       .filter((m) => !month || (m.date >= month && m.date <= endOfMonth(month)))
-      .filter((m) => kf === 'tutti' || (kf === 'previsti' ? m.planned : kf === 'rimborsi' ? m.refund !== 'none' : m.kind === kf))
+      .filter((m) => kf === 'tutti' || (kf === 'previsti' ? m.planned : kf === 'rimborsi' ? m.refund !== 'none' : kf === 'confermare' ? !!m.toConfirm : m.kind === kf))
       .filter((m) => !cat || m.categoryId === cat)
       .filter((m) => !s || m.description.toLowerCase().includes(s) || ctx.cats.get(m.categoryId)?.name.toLowerCase().includes(s) || m.notes?.toLowerCase().includes(s))
       .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt - a.createdAt);
@@ -89,7 +89,8 @@ export function Movements({ onEdit }: { onEdit: (m: Movement) => void }) {
         <div className="filter-row">
           <Segmented<KindFilter> value={kf} onChange={setKf} className="small scroll" options={[
             { value: 'tutti', label: 'Tutti' }, { value: 'uscita', label: 'Uscite' }, { value: 'entrata', label: 'Entrate' },
-            { value: 'previsti', label: 'Previsti' }, { value: 'rimborsi', label: 'Rimborsi' }
+            { value: 'previsti', label: 'Previsti' }, { value: 'rimborsi', label: 'Rimborsi' },
+            { value: 'confermare', label: 'Da confermare' }
           ]} />
           <select value={cat} onChange={(e) => setCat(e.target.value)} aria-label="Categoria">
             <option value="">Tutte le categorie</option>
@@ -128,6 +129,7 @@ export function Movements({ onEdit }: { onEdit: (m: Movement) => void }) {
                       {m.refund === 'pending' && <span className="tag tag-refund"><Briefcase size={12} /> Da rimborsare{partial ? ` ${money(refundOf(m))}` : ''}</span>}
                       {m.refund === 'reimbursed' && <span className="tag tag-ok"><Briefcase size={12} /> Rimborsata{partial ? ` ${money(refundOf(m))}` : ''}</span>}
                       {m.planned && <span className="tag tag-planned"><Clock size={12} /> Prevista</span>}
+                      {m.toConfirm && <span className="tag tag-refund"><ListChecks size={12} /> Da confermare</span>}
                       {m.compFrom && <span className="tag"><CalendarRange size={12} /> Competenza</span>}
                       {m.recurrenceId && <span className="tag"><Repeat size={12} /> Ricorrente</span>}
                     </span>

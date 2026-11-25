@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ArrowDownLeft, ArrowUpRight, Briefcase, FolderSync, Loader2, CalendarClock, Clock, PiggyBank, SkipForward, Target, TriangleAlert, Wallet } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, Briefcase, FolderSync, Loader2, CalendarClock, Clock, ListChecks, PiggyBank, SkipForward, Target, TriangleAlert, Wallet } from 'lucide-react';
 import type { Movement } from '../types';
 import { useStore } from '../data/store';
 import { Badge } from '../components/Icon';
@@ -18,7 +18,7 @@ import { money, money0, parseAmount } from '../lib/format';
 import type { MovementDraft } from './MovementForm';
 
 export function Dashboard({ onAdd, goTo }: { onAdd: (d: MovementDraft) => void; goTo: (tab: string) => void }) {
-  const { state, upsert } = useStore();
+  const { state, upsert, remove } = useStore();
   const [period, setPeriod] = useState<PeriodKey>(() => (localStorage.getItem('runway.period') as PeriodKey) || 'ultimi12');
   const [allDue, setAllDue] = useState(false);
   const [custom, setCustom] = useState({ from: todayISO().slice(0, 4) + '-01-01', to: todayISO() });
@@ -42,6 +42,10 @@ export function Dashboard({ onAdd, goTo }: { onAdd: (d: MovementDraft) => void; 
   const fc = useMemo(() => forecast(state, 12), [state]);
   const fcWhatIf = Number.isFinite(extra) && extra > 0 ? fc.saving - extra : null;
   const due = useMemo(() => dueOccurrences(state), [state]);
+  // movimenti importati lasciati in sospeso (quelli delle ricorrenze sono già tra le scadenze)
+  const toConfirm = useMemo(() => alive(state.movements).filter((m) => m.toConfirm && !m.recurrenceId)
+    .sort((a, b) => a.date.localeCompare(b.date)), [state.movements]);
+  const [allToConfirm, setAllToConfirm] = useState(false);
   const refunds = pendingRefunds(state);
   const refundTotal = refunds.reduce((s, m) => s + refundOf(m), 0);
   const buoni = state.accounts.find((a) => a.kind === 'buoni' && !a.deleted);
@@ -163,6 +167,37 @@ export function Dashboard({ onAdd, goTo }: { onAdd: (d: MovementDraft) => void; 
             <button className="card mini warn" onClick={() => goTo('ricorrenze')}>
               <TriangleAlert size={20} />
               <span><small>Ricorrenze da verificare</small><strong>{toVerify}</strong><small>importate dal vecchio prospetto</small></span>
+            </button>
+          )}
+        </section>
+      )}
+
+      {toConfirm.length > 0 && (
+        <section className="card">
+          <h3 className="card-title"><ListChecks size={18} /> Movimenti da confermare</h3>
+          <div className="list">
+            {(allToConfirm ? toConfirm : toConfirm.slice(0, 6)).map((m) => {
+              const c = ctx.cats.get(m.categoryId);
+              return (
+                <div key={m.id} className="row static">
+                  <Badge icon={c?.icon ?? 'CircleHelp'} color={c?.color ?? '#64748b'} />
+                  <span className="row-main">
+                    <span className="row-title">{m.description || c?.name}</span>
+                    <span className="row-sub">{formatDate(m.date)}{c ? ` · ${c.name}` : ''}</span>
+                  </span>
+                  <span className="row-amount"><strong className={m.kind === 'entrata' ? 'pos' : ''}>{money(m.amount)}</strong></span>
+                  <span className="row-actions">
+                    <button className="btn small primary" onClick={() => onAdd(m)}>Registra</button>
+                    {/* saltato: non conta, e reimportando lo stesso estratto non viene riproposto */}
+                    <button className="icon-btn" title="Salta questa volta" aria-label="Salta" onClick={() => remove('movements', m.id)}><SkipForward size={18} /></button>
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+          {toConfirm.length > 6 && (
+            <button className="btn small ghost" onClick={() => setAllToConfirm(!allToConfirm)}>
+              {allToConfirm ? 'Mostra solo i primi 6' : `Mostra tutti (altri ${toConfirm.length - 6})`}
             </button>
           )}
         </section>

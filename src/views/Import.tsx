@@ -10,7 +10,7 @@ import { isUnicredit, parseUnicredit, type BankRow, type Statement } from '../im
 import { readXlsx } from '../import/xlsx';
 import { isSatispay, parseSatispay } from '../import/satispay';
 import { analyze, type Item, type Plan } from '../import/analyze';
-import { buildCommit, emptyDecisions, groupKey, heldRows, itemChoice, lastImport, recView, undoImport, type Decisions, type RecChoice } from '../import/commit';
+import { buildCommit, emptyDecisions, groupKey, heldRows, isLater, itemChoice, lastImport, recView, undoImport, type Decisions, type RecChoice } from '../import/commit';
 import { confirmDialog } from '../components/Dialog';
 import { cadenceLabel } from '../lib/recurrence';
 import { formatDate } from '../lib/dates';
@@ -37,7 +37,7 @@ export function Import({ onDone }: { onDone: () => void }) {
   const upd = (fn: (x: Decisions) => void) => setD((cur) => {
     const n: Decisions = {
       groupCat: new Map(cur.groupCat), groupSplit: new Map(cur.groupSplit), rowCat: new Map(cur.rowCat), rowDesc: new Map(cur.rowDesc),
-      skip: new Set(cur.skip), recChoice: new Map(cur.recChoice), recEdit: new Map(cur.recEdit)
+      skip: new Set(cur.skip), recChoice: new Map(cur.recChoice), recEdit: new Map(cur.recEdit), later: new Set(cur.later)
     };
     fn(n);
     return n;
@@ -110,9 +110,10 @@ export function Import({ onDone }: { onDone: () => void }) {
       const categoryId = d.groupCat.get(g) ?? items[0].categoryId;
       // "da rivedere" in base alla proposta iniziale: il gruppo resta in elenco anche dopo la scelta
       return { g, items: items.sort((a, b) => b.row.date.localeCompare(a.row.date)), categoryId,
-        review: /^altro-/.test(items[0].categoryId), decided: d.groupCat.has(g) };
+        review: /^altro-/.test(items[0].categoryId), decided: d.groupCat.has(g),
+        later: items.every((i) => d.later.has(i.row.bankId)) };
     }).sort((a, b) => b.items.length - a.items.length || a.items[0].name.localeCompare(b.items[0].name));
-  }, [plan, inRecCard, d.groupCat]);
+  }, [plan, inRecCard, d.groupCat, d.later]);
 
   if (result) {
     return (
@@ -175,12 +176,14 @@ export function Import({ onDone }: { onDone: () => void }) {
   const recCount = plan.recs.filter((r) => d.recChoice.get(r.id) === 'crea').length;
   const recPending = plan.recs.filter((r) => !d.recChoice.has(r.id)).length;
   const reviewGroups = groups.filter((g) => g.review);
-  const undecided = reviewGroups.filter((g) => !g.decided);
+  // in sospeso ("Decidi dopo") conta come deciso
+  const undecided = reviewGroups.filter((g) => !g.decided && !g.later);
+  const laterCount = items.filter((i) => i.status === 'nuovo' && !d.skip.has(i.row.bankId) && !held.has(i.row.bankId) && isLater(i, d)).length;
   const list = filter === 'rivedere' ? reviewGroups : groups;
 
   const commit = async () => {
     // conferma esplicita: un tocco involontario (es. alla riaccensione dello schermo) non deve importare tutto
-    if (!await confirmDialog(`Importare ${toCreate} movimenti${recCount ? ` e ${recCount} ricorrenze` : ''}?`, { ok: 'Importa', cancel: 'Non ancora' })) return;
+    if (!await confirmDialog(`Importare ${toCreate} movimenti${laterCount ? ` (${laterCount} da confermare dopo in Home)` : ''}${recCount ? ` e ${recCount} ricorrenze` : ''}?`, { ok: 'Importa', cancel: 'Non ancora' })) return;
     const res = buildCommit(plan, d, state);
     if (res.recurrences.length) upsertMany('recurrences', res.recurrences);
     if (res.movements.length) upsertMany('movements', res.movements);
@@ -200,6 +203,7 @@ export function Import({ onDone }: { onDone: () => void }) {
           <span><strong>{toCreate}</strong> da importare</span>
           <span><strong>{present.filter((i) => i.status === 'presente').length}</strong> già presenti</span>
           {present.some((i) => i.status === 'importato') && <span><strong>{present.filter((i) => i.status === 'importato').length}</strong> già importati</span>}
+          {laterCount > 0 && <span><strong>{laterCount}</strong> da confermare dopo</span>}
           <span className={undecided.length ? 'warn' : ''}><strong>{undecided.reduce((s, g) => s + g.items.length, 0)}</strong> da rivedere</span>
         </div>
       </section>
@@ -235,9 +239,11 @@ export function Import({ onDone }: { onDone: () => void }) {
                     onChange={(v) => upd((x) => x.recChoice.set(p.id, v))} options={[
                       { value: 'crea', label: p.linkTo ? 'Aggiorna' : 'Crea' },
                       { value: 'singoli', label: 'Movimenti singoli' },
+                      { value: 'dopo', label: 'Decidi dopo' },
                       { value: 'escludi', label: 'Escludi' }
                     ]} />
                   {p.choice === 'escludi' && <p className="muted small">Questi {p.items.length} addebiti non verranno importati.</p>}
+                  {p.choice === 'dopo' && <p className="muted small">Questi {p.items.length} addebiti vengono importati come movimenti da confermare: li ritrovi in Home, in «Movimenti da confermare».</p>}
                   {p.choice === 'singoli' && <p className="muted small">Gli addebiti compaiono tra i movimenti qui sotto, nel gruppo «{p0.name}».</p>}
                   {p.accepted && <>
                     <div className="imp-controls">
@@ -288,6 +294,11 @@ export function Import({ onDone }: { onDone: () => void }) {
           <>
             {filter === 'rivedere' && <p className="muted small">Gruppi senza una categoria precisa. Scegline una: vale per tutto il gruppo e
               viene ricordata per i prossimi import. Quelli già classificati li trovi in "Tutti".</p>}
+            {filter === 'rivedere' && undecided.length > 0 && (
+              <button className="btn small ghost" onClick={() => upd((x) => { for (const g of undecided) for (const i of g.items) x.later.add(i.row.bankId); })}>
+                Decidi dopo per tutti quelli ancora da rivedere
+              </button>
+            )}
             {list.length === 0 && <p className="muted small">Niente da rivedere.</p>}
             <div className="imp-groups">
               {list.slice(0, shown).map(({ g, items: its, categoryId, decided }) => {
@@ -295,6 +306,7 @@ export function Import({ onDone }: { onDone: () => void }) {
                 const kind = its[0].kind;
                 const included = its.filter((i) => !d.skip.has(i.row.bankId));
                 const total = included.reduce((s, i) => s + i.amount, 0);
+                const later = its.every((i) => d.later.has(i.row.bankId));
                 const k = 'g:' + g;
                 return (
                   <div key={g} className={`imp-group ${included.length ? '' : 'off'}`}>
@@ -314,6 +326,10 @@ export function Import({ onDone }: { onDone: () => void }) {
                       <SplitSelect cat={c} value={d.groupSplit.get(g) ?? its[0].split}
                         onChange={(s) => upd((x) => { if (s) x.groupSplit.set(g, s); else x.groupSplit.delete(g); })} />
                     </div>
+                    {included.length > 0 && (
+                      <Toggle checked={later} onChange={(v) => upd((x) => { for (const i of its) { if (v) x.later.add(i.row.bankId); else x.later.delete(i.row.bankId); } })}
+                        label="Decidi dopo" hint={later ? 'Importati come movimenti da confermare: li registri da Home' : undefined} />
+                    )}
                     <button className="link-btn" onClick={() => toggleOpen(k)}>
                       {open.has(k) ? <ChevronDown size={16} /> : <ChevronRight size={16} />} Dettaglio
                     </button>

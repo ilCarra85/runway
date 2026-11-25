@@ -21,7 +21,7 @@ export const TABS: Record<Collection, string> = {
 
 const COLUMNS: Record<Collection, string[]> = {
   movements: ['id', 'date', 'kind', 'amount', 'categoryId', 'accountId', 'description', 'splitMode', 'splitValue', 'refund',
-    'refundIncomeId', 'compFrom', 'compTo', 'planned', 'recurrenceId', 'occurrence', 'notes', 'demo', 'createdAt', 'updatedAt', 'deleted', 'refundAmount', 'importId', 'docFileId', 'docName', 'mealVouchers', 'refundIn'],
+    'refundIncomeId', 'compFrom', 'compTo', 'planned', 'recurrenceId', 'occurrence', 'notes', 'demo', 'createdAt', 'updatedAt', 'deleted', 'refundAmount', 'importId', 'docFileId', 'docName', 'mealVouchers', 'refundIn', 'toConfirm'],
   categories: ['id', 'name', 'icon', 'color', 'kind', 'group', 'splitMode', 'splitValue', 'order', 'excluded', 'updatedAt', 'deleted'],
   accounts: ['id', 'name', 'icon', 'kind', 'order', 'updatedAt', 'deleted', 'checkDate', 'checkBalance', 'voucherValue'],
   recurrences: ['id', 'name', 'kind', 'amount', 'categoryId', 'accountId', 'splitMode', 'splitValue', 'every', 'unit', 'start', 'endMode',
@@ -30,7 +30,7 @@ const COLUMNS: Record<Collection, string[]> = {
 };
 
 const NUM = new Set(['amount', 'refundAmount', 'splitValue', 'order', 'every', 'count', 'createdAt', 'updatedAt', 'mealVouchers', 'checkBalance', 'voucherValue']);
-const BOOL = new Set(['planned', 'demo', 'deleted', 'excluded', 'active', 'toVerify', 'confirm', 'refundable', 'amountAuto', 'refundIn', 'docDate']);
+const BOOL = new Set(['planned', 'demo', 'deleted', 'excluded', 'active', 'toVerify', 'confirm', 'refundable', 'amountAuto', 'refundIn', 'docDate', 'toConfirm']);
 const JSONF = new Set(['skipped', 'docIgnored']);
 
 // ---------- Token ----------

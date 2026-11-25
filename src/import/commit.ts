@@ -26,13 +26,22 @@ export interface Decisions {
    */
   recChoice: Map<string, RecChoice>;
   recEdit: Map<string, { name?: string; categoryId?: string; linkTo?: string | null; confirm?: boolean }>;
+  /** Righe "Decidi dopo": importate come movimenti da confermare in Home. */
+  later: Set<string>;
 }
 
-export type RecChoice = 'crea' | 'singoli' | 'escludi';
+/** dopo = gli addebiti diventano movimenti singoli da confermare in Home. */
+export type RecChoice = 'crea' | 'singoli' | 'dopo' | 'escludi';
 
 export const emptyDecisions = (): Decisions => ({
-  groupCat: new Map(), groupSplit: new Map(), rowCat: new Map(), rowDesc: new Map(), skip: new Set(), recChoice: new Map(), recEdit: new Map()
+  groupCat: new Map(), groupSplit: new Map(), rowCat: new Map(), rowDesc: new Map(), skip: new Set(), recChoice: new Map(), recEdit: new Map(),
+  later: new Set()
 });
+
+/** La riga va importata come "da confermare"? (scelta sul gruppo o sulla ricorrenza proposta) */
+export function isLater(it: Item, d: Decisions): boolean {
+  return d.later.has(it.row.bankId) || (!!it.recId && d.recChoice.get(it.recId) === 'dopo');
+}
 
 export const groupKey = (it: Pick<Item, 'kind' | 'key'>) => `${it.kind}|${it.key}`;
 
@@ -64,7 +73,7 @@ export function heldRows(plan: Plan, d: Decisions): Set<string> {
   const s = new Set<string>();
   for (const r of plan.recs) {
     const c = d.recChoice.get(r.id);
-    if (c === 'crea' || c === 'singoli') continue;
+    if (c === 'crea' || c === 'singoli' || c === 'dopo') continue;
     for (const it of r.items) s.add(it.row.bankId);
   }
   return s;
@@ -106,7 +115,8 @@ function undoRecurrences(state: AppState, at: number, mine: Set<string>) {
  */
 export function undoImport(state: AppState, at: number): Pick<AppState, 'movements' | 'recurrences' | 'rules'> {
   const now = Date.now();
-  const mine = new Set(alive(state.movements).filter((m) => m.importId && m.createdAt === at).map((m) => m.id));
+  // anche quelli già saltati da Home: perdono l'impronta, così il file si reimporta per intero
+  const mine = new Set(state.movements.filter((m) => m.importId && m.createdAt === at).map((m) => m.id));
   const recs = new Set(undoRecurrences(state, at, mine).map((r) => r.id));
   return {
     movements: state.movements.map((m) => {
@@ -201,7 +211,7 @@ export function buildCommit(plan: Plan, d: Decisions, state: AppState): CommitRe
   for (const it of plan.items) {
     if (it.status !== 'nuovo' || inRec.has(it.row.bankId) || held.has(it.row.bankId) || d.skip.has(it.row.bankId)) continue;
     const c = itemChoice(it, d);
-    const m = newMovement(it, c.categoryId, splitOf(c.categoryId, c.split));
+    const m = newMovement(it, c.categoryId, splitOf(c.categoryId, c.split), isLater(it, d) ? { toConfirm: true } : {});
     movements.set(m.id, m);
     created++;
   }
@@ -211,7 +221,8 @@ export function buildCommit(plan: Plan, d: Decisions, state: AppState): CommitRe
   const existing = new Map(alive(state.rules ?? []).map((r) => [`${r.kind}|${r.key}`, r]));
   const learned = new Map<string, { key: string; kind: Item['kind']; categoryId: string; split?: Split }>();
   for (const it of plan.items) {
-    if (it.status !== 'nuovo' || d.skip.has(it.row.bankId) || held.has(it.row.bankId)) continue;
+    // le righe lasciate in sospeso non insegnano niente: la categoria non è ancora decisa
+    if (it.status !== 'nuovo' || d.skip.has(it.row.bankId) || held.has(it.row.bankId) || isLater(it, d)) continue;
     const g = groupKey(it);
     const rp = it.recId ? plan.recs.find((r) => r.id === it.recId) : undefined;
     const rv = rp ? recView(rp, d) : undefined;
