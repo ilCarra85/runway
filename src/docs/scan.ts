@@ -17,6 +17,9 @@ interface CacheEntry { mod: string; tpl?: string; parsed: ParsedDoc | null; ver?
 type Cache = Record<string, CacheEntry>;
 const CACHE_KEY = 'doccache';
 
+/** Dimentica i documenti già letti su questo dispositivo (Ricomincia da capo): verranno riletti da zero. */
+export const clearDocCache = () => idbSet(CACHE_KEY, {});
+
 export interface Proposal {
   recId: string;
   file: DriveFile;

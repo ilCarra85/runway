@@ -5,6 +5,7 @@ import { useStore } from '../data/store';
 import { demoMovements, initialState } from '../data/seed';
 import { isConfigured, sheetUrl } from '../sync/google';
 import { todayISO } from '../lib/dates';
+import { clearDocCache } from '../docs/scan';
 import { alertDialog, confirmDialog } from '../components/Dialog';
 
 export function Settings() {
@@ -96,10 +97,12 @@ export function Settings() {
           store.replace({
             ...state,
             movements: state.movements.map((m) => ({ ...m, deleted: true, importId: undefined, docFileId: undefined, docName: undefined, updatedAt: now })),
-            recurrences: state.recurrences.map((x) => ({ ...x, deleted: true, updatedAt: now })),
+            recurrences: state.recurrences.map((x) => ({ ...x, deleted: true, docIgnored: undefined, updatedAt: now })),
             rules: state.rules.map((x) => ({ ...x, deleted: true, updatedAt: now })),
             accounts: state.accounts.map((a) => (a.checkDate || a.checkBalance !== undefined ? { ...a, checkDate: undefined, checkBalance: undefined, updatedAt: now } : a))
           });
+          // anche la cronologia dei documenti letti dalle cartelle: si rileggono da zero
+          await clearDocCache();
           // la sync automatica parte da sola dopo la modifica e porta le cancellazioni sul foglio
         }}>Ricomincia da capo</button>
         <button className="btn ghost danger" onClick={async () => {
