@@ -63,6 +63,8 @@ export function Categories() {
   );
 }
 
+const NEW_GROUP = '__nuovo__';
+
 function CategoryForm({ initial, kind: k0, onClose }: { initial?: Category; kind: Kind; onClose: () => void }) {
   const { state, upsert, remove } = useStore();
   const [name, setName] = useState(initial?.name ?? '');
@@ -72,7 +74,9 @@ function CategoryForm({ initial, kind: k0, onClose }: { initial?: Category; kind
   const [color, setColor] = useState(initial?.color ?? COLORS[0]);
   const [split, setSplit] = useState<Split>(initial?.split ?? { mode: 'pct', value: 100 });
   const [excluded, setExcluded] = useState(!!initial?.excluded);
-  const groups = [...new Set(state.categories.filter((c) => !c.deleted).map((c) => c.group))];
+  const groups = [...new Set(state.categories.filter((c) => !c.deleted).map((c) => c.group).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  // gruppo esistente dal menu, oppure uno nuovo scritto a mano
+  const [newGroup, setNewGroup] = useState(!!initial?.group && !groups.includes(initial.group));
   const used = initial ? state.movements.some((m) => !m.deleted && m.categoryId === initial.id) : false;
 
   const save = async () => {
@@ -95,8 +99,15 @@ function CategoryForm({ initial, kind: k0, onClose }: { initial?: Category; kind
       <div className="amount-row"><Badge icon={icon} color={color} size={52} /><input className="title-input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Nome categoria" autoFocus={!initial} /></div>
       <Segmented<CategoryKind> value={kind} onChange={setKind} options={KIND_OPTIONS} />
       <Field label="Gruppo">
-        <input list="groups" value={group} onChange={(e) => setGroup(e.target.value)} placeholder="es. Figlie" />
-        <datalist id="groups">{groups.map((g) => <option key={g} value={g} />)}</datalist>
+        <select value={newGroup ? NEW_GROUP : group} onChange={(e) => {
+          const v = e.target.value;
+          if (v === NEW_GROUP) { setNewGroup(true); setGroup(''); } else { setNewGroup(false); setGroup(v); }
+        }}>
+          {!group && !newGroup && <option value="">Scegli un gruppo…</option>}
+          {groups.map((g) => <option key={g} value={g}>{g}</option>)}
+          <option value={NEW_GROUP}>Nuovo gruppo…</option>
+        </select>
+        {newGroup && <input value={group} onChange={(e) => setGroup(e.target.value)} placeholder="Nome del nuovo gruppo, es. Figlie" autoFocus style={{ marginTop: 8 }} />}
       </Field>
       <Field label="Colore">
         <div className="swatches">{COLORS.map((c) => (
