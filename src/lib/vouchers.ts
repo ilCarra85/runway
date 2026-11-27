@@ -25,3 +25,19 @@ export function voucherFlows(state: AppState, acc: Account, upTo = todayISO()) {
   return { payslip, welfare, pendingIncome: Math.max(0, r2(allPayslip - counted)) };
 }
 
+
+/**
+ * Saldo attuale di una carta buoni (pasto o welfare) secondo l'ultimo controllo: il saldo controllato più le entrate
+ * e meno le uscite registrate sul conto dopo il controllo (es. una spesa inserita a mano pagata con i buoni).
+ * Assente se la carta non è mai stata controllata.
+ */
+export function voucherBalance(state: AppState, acc: Account): number | undefined {
+  if (acc.checkBalance === undefined || !acc.checkDate) return undefined;
+  const after = (m: AppState['movements'][number]) => (acc.checkAt ? m.createdAt > acc.checkAt : m.date > acc.checkDate!);
+  let b = acc.checkBalance;
+  for (const m of state.movements) {
+    if (m.deleted || m.planned || m.accountId !== acc.id || !after(m)) continue;
+    b += m.kind === 'entrata' ? m.amount : -m.amount;
+  }
+  return r2(b);
+}

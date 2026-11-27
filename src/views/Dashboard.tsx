@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ArrowDownLeft, ArrowUpRight, Briefcase, FolderSync, Loader2, CalendarClock, Clock, ListChecks, Gift, PiggyBank, Plus, SkipForward, Sparkle, Target, TriangleAlert, Wallet } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, Briefcase, FolderSync, Loader2, CalendarClock, Clock, ListChecks, Gift, PiggyBank, SkipForward, Sparkle, Target, TriangleAlert, Wallet } from 'lucide-react';
 import type { Movement } from '../types';
 import { useStore } from '../data/store';
 import { Badge } from '../components/Icon';
@@ -7,8 +7,8 @@ import { AmountInput, Segmented } from '../components/ui';
 import { MonthlyChart } from '../components/MonthlyChart';
 import { useDocInbox } from '../docs/inbox';
 import { DocReview } from './DocReview';
-import { VoucherCheck, voucherCheckDue, welfareCheckDue } from './VoucherCheck';
-import { WELFARE_CAT } from '../lib/vouchers';
+import { VoucherCheck, voucherCheckDue } from './VoucherCheck';
+import { voucherBalance } from '../lib/vouchers';
 import {
   NORM_DAYS, NORM_LABEL, PERIODS, alive, buildFlows, dueOccurrences, elapsedDays, firstMovementDate, forecast, makeCtx,
   monthlySeries, myShare, pendingRefunds, accountBalance, refundOf, periodRange, summarize, type NormUnit, type PeriodKey
@@ -55,11 +55,9 @@ export function Dashboard({ onAdd, goTo }: { onAdd: (d: MovementDraft) => void; 
   const [checkVouchers, setCheckVouchers] = useState(false);
   const welfare = state.accounts.find((a) => a.kind === 'welfare' && !a.deleted);
   const [checkWelfare, setCheckWelfare] = useState(false);
-  const welfareDue = welfareCheckDue(state, welfare);
-  const addWelfare = () => welfare && onAdd({
-    kind: 'entrata', categoryId: state.categories.some((c) => c.id === WELFARE_CAT && !c.deleted) ? WELFARE_CAT : undefined,
-    accountId: welfare.id, date: todayISO(), description: 'Buoni welfare', split: { mode: 'pct', value: 100 }, planned: false
-  });
+  // buoni welfare: stesso controllo dei buoni pasto (ricevuti = saldo maggiore, usati = saldo minore)
+  const welfareDue = voucherCheckDue(welfare);
+  const welfareBalance = welfare ? voucherBalance(state, welfare) : undefined;
   // buoni pasto importati dall'estratto Edenred: si mostra solo il saldo (il controllo conterebbe due volte le spese)
   const buoniFromFile = !!buoni && state.movements.some((m) => !m.deleted && m.accountId === buoni.id && m.importId?.startsWith('ED:'));
   const buoniBalance = buoni ? accountBalance(state, buoni.id) : 0;
@@ -174,37 +172,36 @@ export function Dashboard({ onAdd, goTo }: { onAdd: (d: MovementDraft) => void; 
               <span><small>Rimborsi in attesa</small><strong>{money(refundTotal)}</strong><small>{refunds.length} spese</small></span>
             </button>
           )}
+          {/* buoni pasto e welfare affiancati */}
+          <div className="mini-pair">
           {buoni && buoniFromFile && (
-            <div className="card mini">
+            <button className="card mini" onClick={() => setCheckVouchers(true)}>
               <Wallet size={20} />
               <span><small>Buoni pasto</small><strong>{money(buoniBalance)}</strong>
                 <small>{Math.round(buoniBalance / (buoni.voucherValue || 10))} buoni da {money(buoni.voucherValue || 10)}</small></span>
-            </div>
+            </button>
           )}
           {buoni && !buoniFromFile && (
             <button className={`card mini${vouchersDue ? ' warn' : ''}`} onClick={() => setCheckVouchers(true)}>
               <Wallet size={20} />
               <span><small>Buoni pasto</small>
                 {buoni.checkBalance !== undefined && buoni.checkDate
-                  ? <><strong>{money(buoni.checkBalance)}</strong><small>{vouchersDue ? 'Da ricontrollare · ' : ''}saldo del {formatDate(buoni.checkDate)}</small></>
+                  ? <><strong>{money(voucherBalance(state, buoni) ?? 0)}</strong><small>{vouchersDue ? 'Da ricontrollare · ' : ''}saldo del {formatDate(buoni.checkDate)}</small></>
                   : <><strong>Controlla</strong><small>Inserisci il saldo della carta</small></>}
               </span>
             </button>
           )}
           {welfare && (
-            <div className={`card mini welfare${welfareDue ? ' warn' : ''}`}>
+            <button className={`card mini${welfareDue ? ' warn' : ''}`} onClick={() => setCheckWelfare(true)}>
               <Gift size={20} />
-              <span className="grow"><small>Buoni welfare</small>
-                {welfare.checkBalance !== undefined && welfare.checkDate
-                  ? <><strong>{money(welfare.checkBalance)}</strong><small>{welfareDue ? 'Da ricontrollare · ' : ''}saldo del {formatDate(welfare.checkDate)}</small></>
-                  : <><strong>—</strong><small>Aggiungi quelli ricevuti</small></>}
+              <span><small>Buoni welfare</small>
+                {welfareBalance !== undefined && welfare.checkDate
+                  ? <><strong>{money(welfareBalance)}</strong><small>{welfareDue ? 'Da ricontrollare · ' : ''}saldo del {formatDate(welfare.checkDate)}</small></>
+                  : <><strong>Controlla</strong><small>Inserisci il saldo della carta</small></>}
               </span>
-              <span className="mini-actions">
-                <button className="btn small" onClick={addWelfare} aria-label="Aggiungi buoni welfare ricevuti"><Plus size={16} /> Ricevuti</button>
-                <button className="btn small ghost" onClick={() => setCheckWelfare(true)}>Saldo</button>
-              </span>
-            </div>
+            </button>
           )}
+          </div>
           {toVerify > 0 && (
             <button className="card mini warn" onClick={() => goTo('ricorrenze')}>
               <TriangleAlert size={20} />
@@ -329,7 +326,7 @@ export function Dashboard({ onAdd, goTo }: { onAdd: (d: MovementDraft) => void; 
         )}
         <p className="muted small">Calcolo: ricorrenze attive per le loro categorie, media reale degli ultimi 6 mesi per tutte le altre, più le spese previste.</p>
       </section>
-      {checkVouchers && buoni && <VoucherCheck account={buoni} onClose={() => setCheckVouchers(false)} />}
+      {checkVouchers && buoni && <VoucherCheck account={buoni} previous={buoniFromFile ? buoniBalance : undefined} onClose={() => setCheckVouchers(false)} />}
       {checkWelfare && welfare && <VoucherCheck account={welfare} onClose={() => setCheckWelfare(false)} />}
     </div>
   );

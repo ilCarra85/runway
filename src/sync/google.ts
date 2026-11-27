@@ -24,7 +24,7 @@ const COLUMNS: Record<Collection, string[]> = {
   movements: ['id', 'date', 'kind', 'amount', 'categoryId', 'accountId', 'description', 'splitMode', 'splitValue', 'refund',
     'refundIncomeId', 'compFrom', 'compTo', 'planned', 'recurrenceId', 'occurrence', 'notes', 'demo', 'createdAt', 'updatedAt', 'deleted', 'refundAmount', 'importId', 'docFileId', 'docName', 'mealVouchers', 'refundIn', 'toConfirm', 'extraordinary', 'time', 'importKey'],
   categories: ['id', 'name', 'icon', 'color', 'kind', 'group', 'splitMode', 'splitValue', 'order', 'excluded', 'updatedAt', 'deleted', 'noForecast'],
-  accounts: ['id', 'name', 'icon', 'kind', 'order', 'updatedAt', 'deleted', 'checkDate', 'checkBalance', 'voucherValue', 'bankRef'],
+  accounts: ['id', 'name', 'icon', 'kind', 'order', 'updatedAt', 'deleted', 'checkDate', 'checkBalance', 'voucherValue', 'bankRef', 'checkAt'],
   recurrences: ['id', 'name', 'kind', 'amount', 'categoryId', 'accountId', 'splitMode', 'splitValue', 'every', 'unit', 'start', 'endMode',
     'count', 'until', 'active', 'toVerify', 'skipped', 'driveFolderId', 'driveFolderName', 'notes', 'updatedAt', 'deleted', 'confirm', 'docTemplate', 'docSupply', 'docIgnored', 'refundable', 'refundAmount', 'amountAuto', 'refundIn', 'docDate'],
   rules: ['id', 'key', 'kind', 'categoryId', 'splitMode', 'splitValue', 'updatedAt', 'deleted', 'description', 'name'],

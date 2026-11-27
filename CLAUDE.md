@@ -9,9 +9,13 @@ Il repository è pubblico: niente dati personali (nomi, importi reali, numeri di
 - L'assegno unico/ANF è un'entrata ripartita.
 - Rimborsi: un'uscita "rimborsabile" viene rimborsata da un'entrata (es. busta paga) a cui la si collega;
   non conta né come spesa né come reddito.
-- Buoni pasto: la busta NON crea movimenti (l'importo resta in Movement.mealVouchers). Controllo periodico in Home
-  (views/VoucherCheck.tsx, lib/vouchers.ts): saldo carta → buoni usati = spesa nella categoria scelta + entrata "Buoni pasto"
-  per la parte arrivata con la busta. I buoni welfare sono entrate manuali nel conto Buoni pasto.
+- Buoni pasto: la busta NON crea movimenti (l'importo resta in Movement.mealVouchers). I movimenti arrivano dall'estratto
+  Excel Edenred (src/import/edenred.ts) o dal controllo in Home (views/VoucherCheck.tsx): numero di buoni sulla carta (mai
+  negativo) confrontato con il saldo precedente (dei movimenti se c'è un import Edenred, altrimenti dell'ultimo controllo).
+  Primo controllo = solo punto di partenza; saldo minore = uscita di oggi nella categoria scelta; maggiore = ricarica di oggi
+  (entrata "Buoni pasto"). Buoni welfare: conto a parte, stesso controllo (ricarica = entrata "Buoni welfare").
+  I movimenti creati dal controllo hanno descrizione "Adeguamento saldo manuale"; quelli inseriti a mano sul conto
+  dopo il controllo aggiornano il saldo (lib/vouchers.ts, voucherBalance).
 - Categorie: kind 'uscita' | 'entrata' | 'entrambe' (helper fitsKind in lib/stats.ts).
 - Dati online nel Google Drive dell'utente (Google Sheet "Runway - Dati").
 

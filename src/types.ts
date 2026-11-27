@@ -39,6 +39,8 @@ export interface Account extends Base {
   /** Conto buoni pasto o welfare: ultimo controllo del saldo della carta (data, saldo in euro, valore di un buono). */
   checkDate?: string;
   checkBalance?: number;
+  /** Momento dell'ultimo controllo: i movimenti del conto inseriti dopo aggiornano il saldo. */
+  checkAt?: number;
   voucherValue?: number;
   /** Conto bancario: riferimenti degli estratti conto importati qui (fine del numero di conto o intestatari), separati da "|". */
   bankRef?: string;

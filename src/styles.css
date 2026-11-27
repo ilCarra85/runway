@@ -518,3 +518,7 @@ label.imp-row { cursor: pointer; }
 .cat-open { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; text-align: left; background: none; border: 0; color: inherit; font: inherit; padding: 0; cursor: pointer; }
 .cat-kind { flex: none; }
 @media (max-width: 560px) { .cat-kind { width: 100%; display: flex; } .cat-kind button { flex: 1; } }
+.mini-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.mini-pair .card.mini { min-width: 0; gap: 8px; padding: 12px; }
+.mini-pair .card.mini span { min-width: 0; }
+.mini-pair .card.mini small { overflow-wrap: anywhere; }
