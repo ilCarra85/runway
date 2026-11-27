@@ -87,18 +87,21 @@ export function Settings() {
         <h3 className="card-title danger"><Trash2 size={18} /> Zona pericolosa</h3>
         <p className="muted small">
           <b>Ricomincia da capo</b> elimina movimenti, ricorrenze e regole su tutti i dispositivi e sul foglio Google
-          (alla prossima sync); categorie e conti restano. Gli estratti conto e i documenti delle cartelle si potranno reimportare.
+          (alla prossima sync); categorie, conti e descrizioni degli enti restano. Gli estratti conto e i documenti delle cartelle si potranno reimportare.
         </p>
         <button className="btn ghost danger" onClick={async () => {
           const n = state.movements.filter((m) => !m.deleted).length, r = state.recurrences.filter((x) => !x.deleted).length;
-          if (!await confirmDialog(`Eliminare ${n} movimenti e ${r} ricorrenze su tutti i dispositivi e sul foglio Google? Categorie e conti restano. Non si può annullare: se vuoi, prima scarica un backup.`, { ok: 'Elimina tutto', danger: true })) return;
+          if (!await confirmDialog(`Eliminare ${n} movimenti e ${r} ricorrenze su tutti i dispositivi e sul foglio Google? Categorie, conti e descrizioni degli enti restano. Non si può annullare: se vuoi, prima scarica un backup.`, { ok: 'Elimina tutto', danger: true })) return;
           const now = Date.now();
           // tombstone senza impronte di import né documenti: così estratti conto e PDF delle cartelle si possono reimportare
           store.replace({
             ...state,
             movements: state.movements.map((m) => ({ ...m, deleted: true, importId: undefined, docFileId: undefined, docName: undefined, updatedAt: now })),
             recurrences: state.recurrences.map((x) => ({ ...x, deleted: true, docIgnored: undefined, updatedAt: now })),
-            rules: state.rules.map((x) => ({ ...x, deleted: true, updatedAt: now })),
+            // delle regole restano solo le descrizioni degli enti (Altro → Enti e descrizioni)
+            rules: state.rules.map((x) => (x.deleted ? x : x.description
+              ? (x.categoryId || x.split ? { ...x, categoryId: '', split: undefined, updatedAt: now } : x)
+              : { ...x, deleted: true, updatedAt: now })),
             imports: (state.imports ?? []).map((x) => ({ ...x, deleted: true, updatedAt: now })),
             accounts: state.accounts.map((a) => (a.checkDate || a.checkBalance !== undefined ? { ...a, checkDate: undefined, checkBalance: undefined, updatedAt: now } : a))
           });

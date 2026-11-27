@@ -140,6 +140,8 @@ export interface Rule extends Base {
   split?: Split;
   /** Descrizione da dare ai movimenti di questo esercente (il nome letto dal file va nelle note). */
   description?: string;
+  /** Nome dell'ente come letto dall'estratto conto (va all'inizio delle note). */
+  name?: string;
 }
 
 /** Cronologia degli import: un record per ogni file importato. */

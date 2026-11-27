@@ -178,7 +178,8 @@ export function propagateCategory(state: AppState, before: Movement, after: Move
   const split = learnCat ? (cat && JSON.stringify(cat.split) !== JSON.stringify(after.split) ? after.split : undefined) : ex?.split;
   return { movements, rule: {
     id: ex?.id ?? uid(), key, kind: before.kind, categoryId: learnCat ? after.categoryId : ex?.categoryId ?? '', split,
-    description: descChanged ? after.description.trim() : ex?.description, updatedAt: Date.now()
+    description: descChanged ? after.description.trim() : ex?.description,
+    name: descChanged ? ex?.name ?? before.description.trim() : ex?.name, updatedAt: Date.now()
   } };
 }
 
@@ -284,7 +285,7 @@ export function buildCommit(plan: Plan, d: Decisions, state: AppState): CommitRe
   for (const [g, l] of learned) {
     const ex = existing.get(g);
     if (ex && ex.categoryId === l.categoryId && JSON.stringify(ex.split) === JSON.stringify(l.split)) continue;
-    rules.push({ id: ex?.id ?? uid(), key: l.key, kind: l.kind, categoryId: l.categoryId, split: l.split, description: ex?.description, updatedAt: now });
+    rules.push({ id: ex?.id ?? uid(), key: l.key, kind: l.kind, categoryId: l.categoryId, split: l.split, description: ex?.description, name: ex?.name, updatedAt: now });
   }
 
   return { at: now, movements: [...movements.values()], recurrences, rules, stats: { created, updated, recurrences: recurrences.length, rules: rules.length } };
