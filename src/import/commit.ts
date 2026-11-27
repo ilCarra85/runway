@@ -142,6 +142,16 @@ export function undoImport(state: AppState, at: number): Pick<AppState, 'movemen
  * la stessa categoria (e ripartizione) va agli altri ancora da confermare dello stesso ente con la stessa proposta,
  * e una regola la fa proporre negli import successivi (non per le categorie generiche "Altro").
  */
+/** Altri movimenti importati ancora da confermare dello stesso ente (stessa chiave esercente e stesso tipo). */
+export function sameMerchantToConfirm(state: AppState, m: Movement): Movement[] {
+  const keyOf = (x: Movement) => x.importKey ?? merchantKey(x.description);
+  const key = keyOf(m);
+  if (!key) return [];
+  return alive(state.movements)
+    .filter((x) => x.id !== m.id && x.toConfirm && !x.recurrenceId && x.kind === m.kind && keyOf(x) === key)
+    .sort((a, b) => b.date.localeCompare(a.date) || (b.time ?? '').localeCompare(a.time ?? ''));
+}
+
 export function propagateCategory(state: AppState, before: Movement, after: Movement): { movements: Movement[]; rule?: Rule } {
   if (!before.toConfirm || !before.importId || before.categoryId === after.categoryId || before.kind !== after.kind) return { movements: [] };
   const keyOf = (m: Movement) => m.importKey ?? merchantKey(m.description);

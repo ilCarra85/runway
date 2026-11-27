@@ -10,7 +10,7 @@ import { fitsKind, myShare, refundOf } from '../lib/stats';
 import { confirmDialog } from '../components/Dialog';
 import { RefundLinks } from '../components/RefundLinks';
 import { PdfPreview } from './DocReview';
-import { propagateCategory } from '../import/commit';
+import { propagateCategory, sameMerchantToConfirm } from '../import/commit';
 
 export type MovementDraft = Partial<Movement> & { kind?: Kind };
 
@@ -37,6 +37,8 @@ export function MovementForm({ initial, onClose }: { initial?: MovementDraft; on
   const [notes, setNotes] = useState(initial?.notes ?? '');
   const [extraordinary, setExtraordinary] = useState(!!initial?.extraordinary);
   const [error, setError] = useState('');
+  // dopo «Registra» di un movimento da confermare: gli altri dello stesso ente da registrare insieme
+  const [others, setOthers] = useState<{ list: Movement[]; pick: Set<string>; saved: Movement } | null>(null);
 
   // Uscite rimborsabili da collegare a un'entrata (busta paga): quelle da rimborsare, quelle già collegate a questa
   // e anche quelle collegate a un'altra entrata (per correggere un collegamento sbagliato: scegliendola si sposta qui)
@@ -128,8 +130,49 @@ export function MovementForm({ initial, onClose }: { initial?: MovementDraft; on
       }
       if (changes.length) upsertMany('movements', changes);
     }
+    if (initial?.toConfirm && initial.id) {
+      const list = sameMerchantToConfirm(state, initial as Movement);
+      if (list.length) return setOthers({ list, pick: new Set(list.map((x) => x.id)), saved: m });
+    }
     onClose();
   };
+
+  // registra gli altri scelti con la stessa categoria e ripartizione (restano data, ora, importo, conto e note di ciascuno)
+  const saveOthers = () => {
+    if (!others) return;
+    const sel = others.list.filter((x) => others.pick.has(x.id))
+      .map((x) => ({ ...x, toConfirm: undefined, categoryId: others.saved.categoryId, split: others.saved.split }));
+    if (sel.length) upsertMany('movements', sel);
+    onClose();
+  };
+
+  if (others) {
+    const n = others.pick.size;
+    const ocat = state.categories.find((c) => c.id === others.saved.categoryId);
+    const toggle = (id: string, on: boolean) => setOthers((o) => { if (!o) return o; const p = new Set(o.pick); if (on) p.add(id); else p.delete(id); return { ...o, pick: p }; });
+    return (
+      <Sheet title="Altri movimenti dello stesso ente" onClose={onClose} footer={<>
+        <button className="btn ghost" onClick={onClose}>Solo questo</button>
+        <button className="btn primary grow" onClick={saveOthers} disabled={!n}>Registra {n} {n === 1 ? 'movimento' : 'movimenti'}</button>
+      </>}>
+        <p className="small">Ci sono altri <strong>{others.list.length}</strong> movimenti da confermare di «{initial?.description}». Li registro con la categoria <strong>{ocat?.name ?? ''}</strong>?</p>
+        <div className="imp-list">
+          {others.list.map((x) => (
+            <label key={x.id} className={`imp-row ${others.pick.has(x.id) ? '' : 'off'}`}>
+              <input type="checkbox" checked={others.pick.has(x.id)} onChange={(e) => toggle(x.id, e.target.checked)} aria-label="Registra" />
+              <span className="imp-date">{formatDate(x.date)}{x.time && <small>{x.time}</small>}</span>
+              <span className="imp-text">{x.description}{x.notes && <small>{x.notes}</small>}</span>
+              <strong className={x.kind === 'entrata' ? 'pos' : ''}>{x.kind === 'entrata' ? '+' : '−'}{money(x.amount)}</strong>
+            </label>
+          ))}
+        </div>
+        <div className="chips">
+          <button type="button" className="chip" onClick={() => setOthers({ ...others, pick: new Set(others.list.map((x) => x.id)) })}>Tutti</button>
+          <button type="button" className="chip" onClick={() => setOthers({ ...others, pick: new Set() })}>Nessuno</button>
+        </div>
+      </Sheet>
+    );
+  }
 
   const del = async () => {
     if (!initial?.id) return;
