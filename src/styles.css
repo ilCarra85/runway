@@ -203,10 +203,12 @@ button.row:hover { background: var(--surface-2); }
 .field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .field-label { font-size: 13px; font-weight: 600; color: var(--text-2); }
 .field-hint { font-size: 12px; color: var(--muted); }
-.date-time { display: flex; gap: 6px; }
-.date-time input[type=date] { flex: 1 1 auto; min-width: 0; }
-.date-time input[type=time] { flex: 0 0 96px; min-width: 0; }
-.date-time .icon-btn { flex: none; }
+.when-desc { display: grid; grid-template-columns: minmax(136px, 160px) auto minmax(0, 1fr); gap: 8px; align-items: stretch; }
+.date-time { display: flex; flex-direction: column; gap: 6px; }
+.date-time input { min-width: 0; }
+.when-desc textarea { flex: 1; resize: none; min-height: 0; }
+.cal-btn { align-self: end; margin-bottom: 28px; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 10px; }
+.cal-btn:active { background: var(--surface-2); }
 .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 @media (max-width: 420px) { .row-2 { grid-template-columns: 1fr; } }
 .amount-row { display: flex; align-items: center; gap: 12px; }

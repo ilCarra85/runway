@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Briefcase, CalendarDays, CalendarRange, Clock, FileText, Sparkle, Trash2 } from 'lucide-react';
+import { Briefcase, CalendarRange, Clock, FileText, Sparkle, Trash2 } from 'lucide-react';
 import type { Kind, Movement, Split } from '../types';
 import { useStore } from '../data/store';
 import { AccountChips, AmountInput, CategoryGrid, Field, Segmented, Sheet, SplitPicker, Toggle, categoryUsage } from '../components/ui';
@@ -12,6 +12,21 @@ import { RefundLinks } from '../components/RefundLinks';
 import { PdfPreview } from './DocReview';
 import { calendarUrl, isPhone } from '../lib/links';
 import { propagateCategory, sameMerchantToConfirm, withOldName } from '../import/commit';
+
+/** Icona in stile calendario Google: bordi colorati e il giorno del movimento. */
+function CalendarIcon({ day }: { day: number }) {
+  return (
+    <svg width="34" height="34" viewBox="0 0 36 36" aria-hidden="true">
+      <rect x="3" y="3" width="30" height="30" rx="4" fill="#fff" />
+      <path d="M7 3h22a4 4 0 0 1 4 4v1H3V7a4 4 0 0 1 4-4z" fill="#4285F4" />
+      <path d="M3 8h5v21H7a4 4 0 0 1-4-4z" fill="#4285F4" />
+      <path d="M28 8h5v19h-5z" fill="#FBBC04" />
+      <path d="M8 28h20v5H7a4 4 0 0 1-4-4v-1z" fill="#34A853" />
+      <path d="M28 27h5v2l-4 4h-1z" fill="#EA4335" />
+      <text x="18" y="23.5" textAnchor="middle" fontSize="12" fontWeight="700" fill="#4285F4" fontFamily="Arial, sans-serif">{day}</text>
+    </svg>
+  );
+}
 
 export type MovementDraft = Partial<Movement> & { kind?: Kind };
 
@@ -213,20 +228,22 @@ export function MovementForm({ initial, onClose }: { initial?: MovementDraft; on
         <CategoryGrid categories={state.categories} kind={kind} value={categoryId} onChange={pickCategory} usage={usage} />
       </Field>
 
-      <div className="row-2">
+      {/* data sopra, ora sotto; poi il calendario (solo da telefono) e la descrizione su due righe */}
+      <div className="when-desc">
         <Field label="Data e ora">
           <div className="date-time">
             <input type="date" value={date} onChange={(e) => changeDate(e.target.value)} />
             <input type="time" value={time} onChange={(e) => setTime(e.target.value)} aria-label="Ora (facoltativa)" />
-            {/* solo da telefono: calendario alla data del movimento */}
-            {isPhone && date && (
-              <a className="icon-btn" href={calendarUrl(date, time)} target="_blank" rel="noopener" aria-label="Apri il calendario a questa data" title="Calendario">
-                <CalendarDays size={20} />
-              </a>
-            )}
           </div>
         </Field>
-        <Field label="Descrizione"><input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="es. Supermercato" /></Field>
+        {isPhone && date && (
+          <a className="cal-btn" href={calendarUrl(date, time)} target="_blank" rel="noopener" aria-label="Apri il calendario a questa data" title="Calendario">
+            <CalendarIcon day={Number(date.slice(8, 10))} />
+          </a>
+        )}
+        <Field label="Descrizione">
+          <textarea rows={2} value={description} onChange={(e) => setDescription(e.target.value.replace(/\s*\n\s*/g, ' '))} placeholder="es. Supermercato" />
+        </Field>
       </div>
 
       <Field label={kind === 'uscita' ? 'Pagato con' : 'Accreditato su'}>

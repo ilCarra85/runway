@@ -18,5 +18,8 @@ export function calendarUrl(date: string, time?: string): string {
   const web = calendarWebUrl(date);
   if (!isAndroid) return web;
   const ms = new Date(`${date}T${time || '12:00'}:00`).getTime();
-  return `intent://com.android.calendar/time/${ms}#Intent;scheme=content;package=com.google.android.calendar;S.browser_fallback_url=${encodeURIComponent(web)};end`;
+  // oltre all'indirizzo con l'orario si passa anche "beginTime" (letto dall'app per scegliere il giorno da mostrare)
+  return `intent://com.android.calendar/time/${ms}#Intent;scheme=content;action=android.intent.action.VIEW;`
+    + `package=com.google.android.calendar;l.beginTime=${ms};l.endTime=${ms + 3600000};`
+    + `S.browser_fallback_url=${encodeURIComponent(web)};end`;
 }
