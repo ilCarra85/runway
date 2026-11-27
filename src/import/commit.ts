@@ -142,6 +142,14 @@ export function undoImport(state: AppState, at: number): Pick<AppState, 'movemen
  * la stessa categoria (e ripartizione) va agli altri ancora da confermare dello stesso ente con la stessa proposta,
  * e una regola la fa proporre negli import successivi (non per le categorie generiche "Altro").
  */
+/** Nome precedente all'inizio delle note: «Vecchio nome - note». */
+export function withOldName(old: string | undefined, notes: string | undefined): string | undefined {
+  const o = old?.trim();
+  if (!o) return notes;
+  if (notes?.toLowerCase().startsWith(o.toLowerCase())) return notes;
+  return notes?.trim() ? `${o} - ${notes.trim()}` : o;
+}
+
 /** Altri movimenti importati ancora da confermare dello stesso ente (stessa chiave esercente e stesso tipo). */
 export function sameMerchantToConfirm(state: AppState, m: Movement): Movement[] {
   const keyOf = (x: Movement) => x.importKey ?? merchantKey(x.description);
@@ -153,18 +161,25 @@ export function sameMerchantToConfirm(state: AppState, m: Movement): Movement[] 
 }
 
 export function propagateCategory(state: AppState, before: Movement, after: Movement): { movements: Movement[]; rule?: Rule } {
-  if (!before.toConfirm || !before.importId || before.categoryId === after.categoryId || before.kind !== after.kind) return { movements: [] };
+  const catChanged = before.categoryId !== after.categoryId;
+  const descChanged = !!after.description.trim() && after.description.trim() !== before.description.trim();
+  if (!before.toConfirm || !before.importId || (!catChanged && !descChanged) || before.kind !== after.kind) return { movements: [] };
   const keyOf = (m: Movement) => m.importKey ?? merchantKey(m.description);
   const key = keyOf(before);
   if (!key) return { movements: [] };
-  const movements = alive(state.movements)
+  const movements = !catChanged ? [] : alive(state.movements)
     .filter((m) => m.id !== before.id && m.toConfirm && !m.recurrenceId && m.kind === before.kind && m.categoryId === before.categoryId && keyOf(m) === key)
     .map((m) => ({ ...m, categoryId: after.categoryId, split: after.split }));
-  if (/^altro-/.test(after.categoryId)) return { movements };
-  const cat = state.categories.find((c) => c.id === after.categoryId);
-  const split = cat && JSON.stringify(cat.split) !== JSON.stringify(after.split) ? after.split : undefined;
+  // categoria nella regola solo se cambiata e non generica ("Altro"); vuota = la regola cambia solo la descrizione
+  const learnCat = catChanged && !/^altro-/.test(after.categoryId);
+  if (!learnCat && !descChanged) return { movements };
   const ex = alive(state.rules ?? []).find((r) => r.key === key && r.kind === before.kind);
-  return { movements, rule: { id: ex?.id ?? uid(), key, kind: before.kind, categoryId: after.categoryId, split, updatedAt: Date.now() } };
+  const cat = state.categories.find((c) => c.id === after.categoryId);
+  const split = learnCat ? (cat && JSON.stringify(cat.split) !== JSON.stringify(after.split) ? after.split : undefined) : ex?.split;
+  return { movements, rule: {
+    id: ex?.id ?? uid(), key, kind: before.kind, categoryId: learnCat ? after.categoryId : ex?.categoryId ?? '', split,
+    description: descChanged ? after.description.trim() : ex?.description, updatedAt: Date.now()
+  } };
 }
 
 export function buildCommit(plan: Plan, d: Decisions, state: AppState): CommitResult {
@@ -179,7 +194,7 @@ export function buildCommit(plan: Plan, d: Decisions, state: AppState): CommitRe
 
   const newMovement = (it: Item, categoryId: string, split: Split, extra: Partial<Movement> = {}): Movement => ({
     id: uid(), kind: it.kind, amount: it.amount, categoryId, accountId: it.row.accountId ?? account, date: it.row.date, time: it.row.time ?? timeIn(it.row.text),
-    description: d.rowDesc.get(it.row.bankId)?.trim() || it.name, notes: it.row.text || it.row.purpose, split, refund: 'none', planned: false,
+    description: d.rowDesc.get(it.row.bankId)?.trim() || it.name, notes: withOldName(it.origName, it.row.text || it.row.purpose), split, refund: 'none', planned: false,
     importId: it.row.bankId, importKey: it.key, createdAt: now, updatedAt: now, ...extra
   });
 
@@ -269,7 +284,7 @@ export function buildCommit(plan: Plan, d: Decisions, state: AppState): CommitRe
   for (const [g, l] of learned) {
     const ex = existing.get(g);
     if (ex && ex.categoryId === l.categoryId && JSON.stringify(ex.split) === JSON.stringify(l.split)) continue;
-    rules.push({ id: ex?.id ?? uid(), key: l.key, kind: l.kind, categoryId: l.categoryId, split: l.split, updatedAt: now });
+    rules.push({ id: ex?.id ?? uid(), key: l.key, kind: l.kind, categoryId: l.categoryId, split: l.split, description: ex?.description, updatedAt: now });
   }
 
   return { at: now, movements: [...movements.values()], recurrences, rules, stats: { created, updated, recurrences: recurrences.length, rules: rules.length } };

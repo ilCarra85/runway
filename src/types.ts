@@ -138,6 +138,8 @@ export interface Rule extends Base {
   categoryId: string;
   /** Ripartizione da usare al posto di quella della categoria (es. quota mutuo già solo mia). */
   split?: Split;
+  /** Descrizione da dare ai movimenti di questo esercente (il nome letto dal file va nelle note). */
+  description?: string;
 }
 
 /** Cronologia degli import: un record per ogni file importato. */

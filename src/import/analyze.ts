@@ -19,6 +19,8 @@ export interface Item {
   key: string;
   /** Nome leggibile dell'esercente. */
   name: string;
+  /** Nome letto dal file, quando una regola lo sostituisce con una descrizione scelta dall'utente. */
+  origName?: string;
   status: 'nuovo' | 'presente' | 'importato';
   /** Movimento esistente abbinato (status "presente"). */
   match?: Movement;
@@ -258,7 +260,9 @@ export function analyze(rows: BankRow[], state: AppState, holder: string, period
     const amount = Math.abs(row.amount);
     const key = itemKey(row);
     const s = suggest(row, kind, key, state, holderWords, cats);
-    const it: Item = { row, kind, amount, key, name: prettyName(row.counterparty), status: 'nuovo', ...s };
+    const pretty = prettyName(row.counterparty);
+    const ren = alive(state.rules ?? []).find((r) => r.key === key && r.kind === kind && r.description)?.description;
+    const it: Item = { row, kind, amount, key, name: ren ?? pretty, origName: ren && ren !== pretty ? pretty : undefined, status: 'nuovo', ...s };
     if (imported.has(row.bankId) || dupOfOther(row.bankId)) { it.status = 'importato'; return it; }
 
     // un movimento di un altro conto (es. Satispay) non va confuso con uno della banca

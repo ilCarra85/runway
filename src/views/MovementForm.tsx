@@ -10,7 +10,7 @@ import { fitsKind, myShare, refundOf } from '../lib/stats';
 import { confirmDialog } from '../components/Dialog';
 import { RefundLinks } from '../components/RefundLinks';
 import { PdfPreview } from './DocReview';
-import { propagateCategory, sameMerchantToConfirm } from '../import/commit';
+import { propagateCategory, sameMerchantToConfirm, withOldName } from '../import/commit';
 
 export type MovementDraft = Partial<Movement> & { kind?: Kind };
 
@@ -99,6 +99,8 @@ export function MovementForm({ initial, onClose }: { initial?: MovementDraft; on
     if (!categoryId) return setError('Scegli una categoria');
     const now = Date.now();
     const id = initial?.id ?? uid();
+    // confermando un movimento importato con una descrizione nuova, il nome originale va all'inizio delle note
+    const renamed = !!initial?.toConfirm && !!description.trim() && description.trim() !== (initial.description ?? '').trim();
     const m: Movement = {
       // campi non modificabili qui (documento, import, buoni pasto) restano quelli del movimento
       importId: initial?.importId, docFileId: initial?.docFileId, docName: initial?.docName, mealVouchers: initial?.mealVouchers,
@@ -111,7 +113,7 @@ export function MovementForm({ initial, onClose }: { initial?: MovementDraft; on
       compFrom: comp ? compFrom + '-01' : undefined,
       compTo: comp ? endOfMonth(compTo + '-01') : undefined,
       planned, extraordinary: extraordinary || undefined, recurrenceId: initial?.recurrenceId, occurrence: initial?.occurrence,
-      notes: notes.trim() || undefined, demo: initial?.demo, createdAt: initial?.createdAt ?? now, updatedAt: now
+      notes: (renamed ? withOldName(initial?.description, notes.trim()) : notes.trim()) || undefined, demo: initial?.demo, createdAt: initial?.createdAt ?? now, updatedAt: now
     };
     upsert('movements', m);
     // categoria cambiata confermando un movimento importato: si adeguano gli altri dello stesso ente e gli import futuri
@@ -141,7 +143,11 @@ export function MovementForm({ initial, onClose }: { initial?: MovementDraft; on
   const saveOthers = () => {
     if (!others) return;
     const sel = others.list.filter((x) => others.pick.has(x.id))
-      .map((x) => ({ ...x, toConfirm: undefined, categoryId: others.saved.categoryId, split: others.saved.split }));
+      .map((x) => {
+        const renamed = x.description.trim() !== others.saved.description.trim();
+        return { ...x, toConfirm: undefined, categoryId: others.saved.categoryId, split: others.saved.split,
+          description: others.saved.description, notes: renamed ? withOldName(x.description, x.notes) : x.notes };
+      });
     if (sel.length) upsertMany('movements', sel);
     onClose();
   };
@@ -155,7 +161,7 @@ export function MovementForm({ initial, onClose }: { initial?: MovementDraft; on
         <button className="btn ghost" onClick={onClose}>Solo questo</button>
         <button className="btn primary grow" onClick={saveOthers} disabled={!n}>Registra {n} {n === 1 ? 'movimento' : 'movimenti'}</button>
       </>}>
-        <p className="small">Ci sono altri <strong>{others.list.length}</strong> movimenti da confermare di «{initial?.description}». Li registro con la categoria <strong>{ocat?.name ?? ''}</strong>?</p>
+        <p className="small">Ci sono altri <strong>{others.list.length}</strong> movimenti da confermare di «{initial?.description}». Li registro con la categoria <strong>{ocat?.name ?? ''}</strong>{others.saved.description !== initial?.description && <> e la descrizione <strong>{others.saved.description}</strong> (il nome originale va nelle note)</>}?</p>
         <div className="imp-list">
           {others.list.map((x) => (
             <label key={x.id} className={`imp-row ${others.pick.has(x.id) ? '' : 'off'}`}>
