@@ -3,7 +3,7 @@
 // I movimenti vanno nel conto Satispay; l'ID è univoco e fa da impronta anti-doppioni.
 
 import type { BankRow, Statement } from './unicredit';
-import { excelDate } from './xlsx';
+import { excelDate, excelTime } from './xlsx';
 
 type Cell = string | number;
 
@@ -29,7 +29,7 @@ export function parseSatispay(rows: Cell[][], accountId = 'satispay'): Statement
     const type = cleanType(String(r[cType] ?? ''));
     const date = excelDate(r[cDate] as number);
     return {
-      bankId: `SP:${String(r[cId])}`, bookDate: date, date, amount: Math.round((r[cAmt] as number) * 100) / 100,
+      bankId: `SP:${String(r[cId])}`, bookDate: date, date, time: excelTime(r[cDate] as number), amount: Math.round((r[cAmt] as number) * 100) / 100,
       type: `SATISPAY ${type.toUpperCase()}`, counterparty: name || type, purpose: desc || undefined,
       text: [type, name, desc].filter(Boolean).join(' · '), accountId
     };

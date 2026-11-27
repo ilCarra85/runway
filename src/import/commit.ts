@@ -2,7 +2,8 @@
 
 import type { AppState, Movement, Recurrence, Rule, Split } from '../types';
 import type { Item, Plan, RecProposal } from './analyze';
-import { nearestOccurrence } from './analyze';
+import { merchantKey, nearestOccurrence } from './analyze';
+import { timeIn } from './unicredit';
 import { isOccurrence, occurrencesBetween, recRefund } from '../lib/recurrence';
 import { alive } from '../lib/stats';
 import { minISO } from '../lib/dates';
@@ -136,7 +137,27 @@ export function undoImport(state: AppState, at: number): Pick<AppState, 'movemen
   };
 }
 
-export function buildCommit(plan: Plan, d: Decisions, state: AppState): CommitResult {
+/**
+ * Registrando un movimento importato "da confermare" con una categoria diversa da quella proposta:
+ * la stessa categoria (e ripartizione) va agli altri ancora da confermare dello stesso ente con la stessa proposta,
+ * e una regola la fa proporre negli import successivi (non per le categorie generiche "Altro").
+ */
+export function propagateCategory(state: AppState, before: Movement, after: Movement): { movements: Movement[]; rule?: Rule } {
+  if (!before.toConfirm || !before.importId || before.categoryId === after.categoryId || before.kind !== after.kind) return { movements: [] };
+  const keyOf = (m: Movement) => m.importKey ?? merchantKey(m.description);
+  const key = keyOf(before);
+  if (!key) return { movements: [] };
+  const movements = alive(state.movements)
+    .filter((m) => m.id !== before.id && m.toConfirm && !m.recurrenceId && m.kind === before.kind && m.categoryId === before.categoryId && keyOf(m) === key)
+    .map((m) => ({ ...m, categoryId: after.categoryId, split: after.split }));
+  if (/^altro-/.test(after.categoryId)) return { movements };
+  const cat = state.categories.find((c) => c.id === after.categoryId);
+  const split = cat && JSON.stringify(cat.split) !== JSON.stringify(after.split) ? after.split : undefined;
+  const ex = alive(state.rules ?? []).find((r) => r.key === key && r.kind === before.kind);
+  return { movements, rule: { id: ex?.id ?? uid(), key, kind: before.kind, categoryId: after.categoryId, split, updatedAt: Date.now() } };
+}
+
+export function buildCommit(plan: Plan, d: Decisions, state: AppState, methodId?: string): CommitResult {
   const now = Date.now();
   const cats = new Map(state.categories.map((c) => [c.id, c]));
   const account = state.accounts.find((a) => a.id === 'conto' && !a.deleted)?.id
@@ -147,15 +168,17 @@ export function buildCommit(plan: Plan, d: Decisions, state: AppState): CommitRe
   let created = 0, updated = 0;
 
   const newMovement = (it: Item, categoryId: string, split: Split, extra: Partial<Movement> = {}): Movement => ({
-    id: uid(), kind: it.kind, amount: it.amount, categoryId, accountId: it.row.accountId ?? account, date: it.row.date,
-    description: d.rowDesc.get(it.row.bankId)?.trim() || it.name, notes: it.row.purpose, split, refund: 'none', planned: false,
-    importId: it.row.bankId, createdAt: now, updatedAt: now, ...extra
+    id: uid(), kind: it.kind, amount: it.amount, categoryId, accountId: it.row.accountId ?? account, date: it.row.date, time: it.row.time ?? timeIn(it.row.text), methodId,
+    description: d.rowDesc.get(it.row.bankId)?.trim() || it.name, notes: it.row.text || it.row.purpose, split, refund: 'none', planned: false,
+    importId: it.row.bankId, importKey: it.key, createdAt: now, updatedAt: now, ...extra
   });
 
   // 1) già presenti: si collega l'impronta; se vengono da una ricorrenza si correggono importo e data
   for (const it of plan.items) {
     if (it.status !== 'presente' || !it.match || d.skip.has(it.row.bankId)) continue;
-    const m: Movement = { ...it.match, importId: it.row.bankId };
+    const m: Movement = { ...it.match, importId: it.row.bankId, notes: it.match.notes || it.row.text || it.row.purpose };
+    if (!m.time) m.time = it.row.time ?? timeIn(it.row.text);
+    if (!m.methodId && methodId) m.methodId = methodId;
     if (it.fixMatch) { m.amount = it.amount; m.date = it.row.date; }
     movements.set(m.id, m);
     updated++;

@@ -16,6 +16,8 @@ interface Store {
   patchSettings(p: Partial<Settings>): void;
   replace(s: AppState): void;
   sync: { status: SyncStatus; error?: string; run(interactive?: boolean): Promise<void>; signOut(): void };
+  /** Accesso a Google obbligatorio: finché manca si vede solo la schermata di login. */
+  authed: boolean;
 }
 
 const Ctx = createContext<Store | null>(null);
@@ -31,6 +33,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   );
   const [error, setError] = useState<string>();
   const syncing = useRef(false);
+  const [authed, setAuthed] = useState(!google.isConfigured() || google.hasValidToken());
+  const [loginError, setLoginError] = useState<string>();
+  const [loggingIn, setLoggingIn] = useState(false);
 
   // Caricamento iniziale
   useEffect(() => {
@@ -117,7 +122,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const t = setTimeout(() => run(false), dirty === 0 ? 300 : 3000);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dirty, state === null]);
+  }, [dirty, state === null, authed]);
 
   const store = useMemo<Store | null>(() => {
     if (!state) return null;
@@ -144,12 +149,46 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       replace: (n) => edit(() => n),
       sync: {
         status, error, run,
-        signOut: () => { google.signOut(); setStatus('login'); }
-      }
+        signOut: () => { google.signOut(); setStatus('login'); setAuthed(false); }
+      },
+      authed
     };
-  }, [state, status, error, edit, run]);
+  }, [state, status, error, edit, run, authed]);
+
+  // Login (da un click): se l'account è diverso da quello dell'ultima volta i dati locali vengono azzerati
+  const login = async () => {
+    setLoggingIn(true); setLoginError(undefined);
+    try {
+      await google.signIn();
+      const acc = await google.currentAccount();
+      const prev = google.lastAccount();
+      if (prev && prev !== acc) {
+        const fresh = initialState();
+        ref.current = fresh;
+        setState(fresh);
+        await idbSet(KEY, fresh);
+      }
+      google.rememberAccount(acc);
+      setStatus('idle');
+      setAuthed(true);
+      setDirty((d) => d + 1);
+    } catch (e: any) {
+      setLoginError(e?.message || String(e));
+    } finally {
+      setLoggingIn(false);
+    }
+  };
 
   if (!store) return <div className="splash">Runway</div>;
+  if (!authed) return (
+    <div className="login-screen">
+      <img src="./icon.svg" alt="" className="login-logo" />
+      <h1>Runway</h1>
+      <p className="muted">Accedi con il tuo account Google per vedere i tuoi dati.</p>
+      <button className="btn primary" onClick={login} disabled={loggingIn}>{loggingIn ? 'Accesso…' : 'Accedi con Google'}</button>
+      {loginError && <p className="error small">{loginError}</p>}
+    </div>
+  );
   return <Ctx.Provider value={store}>{children}</Ctx.Provider>;
 }
 
@@ -166,6 +205,8 @@ function withNewSeedCategories(s: AppState): AppState {
   const haveA = new Set(s.accounts.map((a) => a.id));
   const cats = init.categories.filter((c) => !haveC.has(c.id));
   const accs = init.accounts.filter((a) => !haveA.has(a.id));
-  if (!cats.length && !accs.length) return s;
-  return { ...s, categories: [...s.categories, ...cats], accounts: [...s.accounts, ...accs] };
+  // metodi di pagamento: proposti solo la prima volta (poi l'elenco è dell'utente)
+  const methods = s.methods?.length ? s.methods : init.methods;
+  if (!cats.length && !accs.length && methods === s.methods) return s;
+  return { ...s, categories: [...s.categories, ...cats], accounts: [...s.accounts, ...accs], methods };
 }

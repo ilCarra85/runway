@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Briefcase, CalendarRange, Clock, FileText, Sparkle, Trash2 } from 'lucide-react';
 import type { Kind, Movement, Split } from '../types';
 import { useStore } from '../data/store';
-import { AccountChips, AmountInput, CategoryGrid, Field, Segmented, Sheet, SplitPicker, Toggle, categoryUsage } from '../components/ui';
+import { AccountChips, MethodChips, AmountInput, CategoryGrid, Field, Segmented, Sheet, SplitPicker, Toggle, categoryUsage } from '../components/ui';
 import { amountToInput, money, parseAmount, uid } from '../lib/format';
 import { endOfMonth, formatDate, todayISO } from '../lib/dates';
 import { Badge } from '../components/Icon';
@@ -10,6 +10,7 @@ import { fitsKind, myShare, refundOf } from '../lib/stats';
 import { confirmDialog } from '../components/Dialog';
 import { RefundLinks } from '../components/RefundLinks';
 import { PdfPreview } from './DocReview';
+import { propagateCategory } from '../import/commit';
 
 export type MovementDraft = Partial<Movement> & { kind?: Kind };
 
@@ -21,6 +22,8 @@ export function MovementForm({ initial, onClose }: { initial?: MovementDraft; on
   const [categoryId, setCategoryId] = useState(initial?.categoryId ?? '');
   const [accountId, setAccountId] = useState(initial?.accountId ?? 'conto');
   const [date, setDate] = useState(initial?.date ?? todayISO());
+  const [time, setTime] = useState(initial?.time ?? '');
+  const [methodId, setMethodId] = useState<string | undefined>(initial?.methodId);
   const [description, setDescription] = useState(initial?.description ?? '');
   const [split, setSplit] = useState<Split>(initial?.split ?? { mode: 'pct', value: 100 });
   const [splitTouched, setSplitTouched] = useState(!!initial?.split);
@@ -98,7 +101,7 @@ export function MovementForm({ initial, onClose }: { initial?: MovementDraft; on
     const m: Movement = {
       // campi non modificabili qui (documento, import, buoni pasto) restano quelli del movimento
       importId: initial?.importId, docFileId: initial?.docFileId, docName: initial?.docName, mealVouchers: initial?.mealVouchers,
-      id, kind, amount: value, categoryId, accountId, date,
+      id, kind, amount: value, categoryId, accountId, date, time: time || undefined, methodId,
       description: description.trim() || cat?.name || '',
       split, refund: kind === 'uscita' && refund !== 'none' ? (incomeId ? 'reimbursed' : 'pending') : 'none',
       refundAmount: kind === 'uscita' && refund !== 'none' ? refundAmount : undefined,
@@ -110,6 +113,12 @@ export function MovementForm({ initial, onClose }: { initial?: MovementDraft; on
       notes: notes.trim() || undefined, demo: initial?.demo, createdAt: initial?.createdAt ?? now, updatedAt: now
     };
     upsert('movements', m);
+    // categoria cambiata confermando un movimento importato: si adeguano gli altri dello stesso ente e gli import futuri
+    if (initial?.toConfirm && initial.id) {
+      const p = propagateCategory(state, initial as Movement, m);
+      if (p.movements.length) upsertMany('movements', p.movements);
+      if (p.rule) upsert('rules', p.rule);
+    }
     if (kind === 'entrata') {
       const changes: Movement[] = [];
       for (const r of refundsAvailable) {
@@ -156,12 +165,21 @@ export function MovementForm({ initial, onClose }: { initial?: MovementDraft; on
       </Field>
 
       <div className="row-2">
-        <Field label="Data"><input type="date" value={date} onChange={(e) => changeDate(e.target.value)} /></Field>
+        <Field label="Data e ora">
+          <div className="date-time">
+            <input type="date" value={date} onChange={(e) => changeDate(e.target.value)} />
+            <input type="time" value={time} onChange={(e) => setTime(e.target.value)} aria-label="Ora (facoltativa)" />
+          </div>
+        </Field>
         <Field label="Descrizione"><input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="es. Supermercato" /></Field>
       </div>
 
       <Field label={kind === 'uscita' ? 'Pagato con' : 'Accreditato su'}>
         <AccountChips accounts={state.accounts} value={accountId} onChange={setAccountId} />
+      </Field>
+
+      <Field label="Metodo di pagamento">
+        <MethodChips methods={state.methods ?? []} value={methodId} onChange={setMethodId} />
       </Field>
 
       <Field label="Ripartizione" hint={cat && cat.split.value !== 100 ? `Predefinita per ${cat.name}` : undefined}>

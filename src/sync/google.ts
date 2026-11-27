@@ -17,18 +17,20 @@ export const TABS: Record<Collection, string> = {
   accounts: 'Conti',
   recurrences: 'Ricorrenze',
   rules: 'Regole',
-  imports: 'Import'
+  imports: 'Import',
+  methods: 'Metodi'
 };
 
 const COLUMNS: Record<Collection, string[]> = {
   movements: ['id', 'date', 'kind', 'amount', 'categoryId', 'accountId', 'description', 'splitMode', 'splitValue', 'refund',
-    'refundIncomeId', 'compFrom', 'compTo', 'planned', 'recurrenceId', 'occurrence', 'notes', 'demo', 'createdAt', 'updatedAt', 'deleted', 'refundAmount', 'importId', 'docFileId', 'docName', 'mealVouchers', 'refundIn', 'toConfirm', 'extraordinary'],
+    'refundIncomeId', 'compFrom', 'compTo', 'planned', 'recurrenceId', 'occurrence', 'notes', 'demo', 'createdAt', 'updatedAt', 'deleted', 'refundAmount', 'importId', 'docFileId', 'docName', 'mealVouchers', 'refundIn', 'toConfirm', 'extraordinary', 'time', 'methodId', 'importKey'],
   categories: ['id', 'name', 'icon', 'color', 'kind', 'group', 'splitMode', 'splitValue', 'order', 'excluded', 'updatedAt', 'deleted'],
   accounts: ['id', 'name', 'icon', 'kind', 'order', 'updatedAt', 'deleted', 'checkDate', 'checkBalance', 'voucherValue'],
   recurrences: ['id', 'name', 'kind', 'amount', 'categoryId', 'accountId', 'splitMode', 'splitValue', 'every', 'unit', 'start', 'endMode',
     'count', 'until', 'active', 'toVerify', 'skipped', 'driveFolderId', 'driveFolderName', 'notes', 'updatedAt', 'deleted', 'confirm', 'docTemplate', 'docSupply', 'docIgnored', 'refundable', 'refundAmount', 'amountAuto', 'refundIn', 'docDate'],
   rules: ['id', 'key', 'kind', 'categoryId', 'splitMode', 'splitValue', 'updatedAt', 'deleted'],
-  imports: ['id', 'name', 'from', 'to', 'rows', 'at', 'undone', 'updatedAt', 'deleted']
+  imports: ['id', 'name', 'from', 'to', 'rows', 'at', 'undone', 'updatedAt', 'deleted'],
+  methods: ['id', 'name', 'icon', 'order', 'updatedAt', 'deleted']
 };
 
 const NUM = new Set(['amount', 'refundAmount', 'splitValue', 'order', 'every', 'count', 'createdAt', 'updatedAt', 'mealVouchers', 'checkBalance', 'voucherValue', 'rows', 'at']);
@@ -81,7 +83,7 @@ export async function signIn(): Promise<void> {
         } catch { /* storage non disponibile */ }
         resolve();
       },
-      error_callback: (e: any) => reject(new Error(e?.message || 'Accesso annullato'))
+      error_callback: (e: any) => reject(new Error(e?.type === 'popup_failed_to_open' ? 'Il browser ha bloccato la finestra di accesso di Google: consenti i popup e riprova' : 'Accesso annullato'))
     });
     client.requestAccessToken({ prompt: hasSignedInBefore() && !scopeChanged() ? '' : 'consent' });
   });
@@ -95,6 +97,16 @@ export function signOut() {
 }
 
 export class AuthError extends Error {}
+
+const ACCOUNT_KEY = 'runway.account';
+/** Account Google dell'ultimo accesso su questo dispositivo (id Drive, non l'email). */
+export const lastAccount = () => { try { return localStorage.getItem(ACCOUNT_KEY); } catch { return null; } };
+export const rememberAccount = (id: string) => { try { localStorage.setItem(ACCOUNT_KEY, id); } catch { /* */ } };
+/** Id stabile dell'account collegato (serve un token valido). */
+export async function currentAccount(): Promise<string> {
+  const r = await api<{ user: { permissionId: string } }>('https://www.googleapis.com/drive/v3/about?fields=user(permissionId)');
+  return r.user.permissionId;
+}
 
 /** Token OAuth corrente (per il Picker), o null se scaduto. */
 export const accessToken = () => (hasValidToken() ? tokenInfo!.token : null);

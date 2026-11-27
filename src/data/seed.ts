@@ -1,4 +1,4 @@
-import type { Account, AppState, Category, Kind, Movement, Recurrence, Split, Unit } from '../types';
+import type { PayMethod, Account, AppState, Category, Kind, Movement, Recurrence, Split, Unit } from '../types';
 import { addDays, addMonths, endOfMonth, startOfMonth, todayISO } from '../lib/dates';
 import { uid } from '../lib/format';
 
@@ -77,6 +77,16 @@ export const SEED_ACCOUNTS: Account[] = [
   { id: 'carta-credito', name: 'Carta di credito', icon: 'CreditCard', kind: 'carta', order: 5, updatedAt: 1 }
 ];
 
+/** Metodi di pagamento proposti (si modificano in Altro → Metodi di pagamento). */
+export const SEED_METHODS: PayMethod[] = [
+  { id: 'm-debito', name: 'Carta di debito', icon: 'CreditCard', order: 0, updatedAt: 1 },
+  { id: 'm-credito', name: 'Carta di credito', icon: 'CreditCard', order: 1, updatedAt: 1 },
+  { id: 'm-genius', name: 'Genius Pay', icon: 'Smartphone', order: 2, updatedAt: 1 },
+  { id: 'm-bonifico', name: 'Bonifico', icon: 'ArrowLeftRight', order: 3, updatedAt: 1 },
+  { id: 'm-sepa', name: 'Addebito diretto', icon: 'Landmark', order: 4, updatedAt: 1 },
+  { id: 'm-contanti', name: 'Contanti', icon: 'Banknote', order: 5, updatedAt: 1 }
+];
+
 type R = [name: string, kind: Kind, amount: number, cat: string, every: number, unit: Unit, split?: Split];
 /**
  * Voci ricorrenti proposte a un'installazione nuova (disattivate, "da verificare"). Vuoto: le ricorrenze vere arrivano
@@ -100,6 +110,7 @@ export function initialState(): AppState {
     recurrences: seedRecurrences(),
     rules: [],
     imports: [],
+    methods: SEED_METHODS,
     settings: {}
   };
 }

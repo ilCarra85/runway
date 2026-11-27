@@ -30,7 +30,7 @@ export function Movements({ onEdit }: { onEdit: (m: Movement) => void }) {
       .filter((m) => kf === 'tutti' || (kf === 'previsti' ? m.planned : kf === 'rimborsi' ? m.refund !== 'none' : kf === 'confermare' ? !!m.toConfirm : kf === 'straordinari' ? !!m.extraordinary : m.kind === kf))
       .filter((m) => !cat || m.categoryId === cat)
       .filter((m) => !s || m.description.toLowerCase().includes(s) || ctx.cats.get(m.categoryId)?.name.toLowerCase().includes(s) || m.notes?.toLowerCase().includes(s))
-      .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt - a.createdAt);
+      .sort((a, b) => b.date.localeCompare(a.date) || (b.time ?? '').localeCompare(a.time ?? '') || b.createdAt - a.createdAt);
   }, [state, month, q, kf, cat, ctx]);
 
   const totals = useMemo(() => {
@@ -58,6 +58,7 @@ export function Movements({ onEdit }: { onEdit: (m: Movement) => void }) {
   }, [list]);
 
   const accounts = new Map(state.accounts.map((a) => [a.id, a]));
+  const methods = new Map((state.methods ?? []).map((x) => [x.id, x]));
 
   return (
     <div className="page">
@@ -122,8 +123,10 @@ export function Movements({ onEdit }: { onEdit: (m: Movement) => void }) {
                   <span className="row-main">
                     <span className="row-title">{m.description || c?.name}</span>
                     <span className="row-sub">
+                      {m.time && <span className="dot-sep">{m.time}</span>}
                       {c && m.description && m.description !== c.name && <span>{c.name}</span>}
                       {acc && <span className="dot-sep"><Icon name={acc.icon} size={12} /> {acc.name}</span>}
+                      {m.methodId && methods.get(m.methodId) && <span className="dot-sep">{methods.get(m.methodId)!.name}</span>}
                     </span>
                     <span className="row-tags">
                       <SplitBadge split={m.split} />

@@ -19,6 +19,8 @@ export interface BankRow {
   /** Pagamento online (POS E-Commerce). */
   online?: boolean;
   text: string; // descrizione completa
+  /** Orario dell'operazione (HH:MM), se il file lo riporta. */
+  time?: string;
   /** Conto del movimento (es. satispay); assente = conto corrente. */
   accountId?: string;
 }
@@ -37,6 +39,11 @@ export interface Statement {
 const DATE = /^\d{2}\.\d{2}\.\d{4}$/;
 const AMOUNT = /^-?[\d.]+,\d{2}$/;
 const iso = (d: string) => { const [g, m, a] = d.split(/[./]/); return `${a.length === 2 ? '20' + a : a}-${m}-${g}`; };
+/** Orario scritto nella descrizione (es. "ore 12:34"); solo con i due punti, per non confonderlo con date e importi. */
+export const timeIn = (t?: string) => {
+  const m = t?.match(/(?:^|[^\d:])([01]?\d|2[0-3]):([0-5]\d)(?::[0-5]\d)?(?![\d:])/);
+  return m ? `${m[1].padStart(2, '0')}:${m[2]}` : undefined;
+};
 export const parseIt = (s: string) => Number(s.replace(/\./g, '').replace(',', '.'));
 
 const SKIP = /^(Data contabile|Il presente documento|LISTA MOVIMENTI|Filiale|Data da)/;

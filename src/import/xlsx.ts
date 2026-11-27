@@ -68,6 +68,13 @@ export async function readXlsx(data: ArrayBuffer): Promise<Cell[][]> {
 }
 
 /** Data seriale di Excel (giorni dal 30/12/1899) → ISO YYYY-MM-DD. */
+/** Orario di una data Excel (HH:MM), assente se la cella ha solo la data. */
+export function excelTime(n: number): string | undefined {
+  const min = Math.round((n % 1) * 1440);
+  if (!min || min >= 1440) return undefined;
+  return `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
+}
+
 export function excelDate(n: number): string {
   const d = new Date(Date.UTC(1899, 11, 30) + Math.round(n * 86400000));
   return d.toISOString().slice(0, 10);

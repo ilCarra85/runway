@@ -38,6 +38,10 @@ export function Import({ onDone }: { onDone: () => void }) {
   const last = useMemo(() => lastImport(state), [state]);
   const history = useMemo(() => (state.imports ?? []).filter((x) => !x.deleted).sort((a, b) => b.at - a.at || a.name.localeCompare(b.name)), [state.imports]);
   const [allHistory, setAllHistory] = useState(false);
+  // metodo di pagamento dei movimenti del file: si ricorda l'ultimo scelto per ogni tipo di file
+  const [fmt, setFmt] = useState('');
+  const [methodId, setMethodId] = useState<string>();
+  const pickMethod = (id?: string) => { setMethodId(id); try { if (id) localStorage.setItem('runway.method.' + fmt, id); else localStorage.removeItem('runway.method.' + fmt); } catch { /* */ } };
   const upd = (fn: (x: Decisions) => void) => setD((cur) => {
     const n: Decisions = {
       groupCat: new Map(cur.groupCat), groupSplit: new Map(cur.groupSplit), rowCat: new Map(cur.rowCat), rowDesc: new Map(cur.rowDesc),
@@ -53,6 +57,7 @@ export function Import({ onDone }: { onDone: () => void }) {
     const rows: BankRow[] = [];
     const info: typeof files = [];
     let holder = '', from = '', to = '';
+    const fmts = new Set<string>();
     try {
       for (const f of Array.from(list)) {
         setBusy(`Leggo ${f.name}…`);
@@ -62,10 +67,11 @@ export function Import({ onDone }: { onDone: () => void }) {
           if (!isSatispay(cells)) throw new Error(`"${f.name}" non sembra un export di Satispay.`);
           const acc = state.accounts.find((a) => a.id === 'satispay' && !a.deleted) ?? state.accounts.find((a) => /satispay/i.test(a.name) && !a.deleted);
           st = parseSatispay(cells, acc?.id ?? 'satispay');
+          fmts.add('satispay');
         } else {
           const data = await f.arrayBuffer();
           const lines = await pdfLines(data.slice(0));
-          if (isUnicredit(lines)) st = parseUnicredit(lines);
+          if (isUnicredit(lines)) { st = parseUnicredit(lines); fmts.add('uc-lista'); }
           else {
             // estratto conto periodico: i movimenti sono nelle prime pagine
             const items = await pdfItems(data.slice(0), 4);
@@ -74,7 +80,8 @@ export function Import({ onDone }: { onDone: () => void }) {
               const acc = state.accounts.find((a) => a.id === 'carta-credito' && !a.deleted)
                 ?? state.accounts.find((a) => a.kind === 'carta' && /credito/i.test(a.name) && !a.deleted);
               st = parseUnicreditCc(items, acc?.id ?? 'carta-credito');
-            } else if (isUnicreditEc(items)) st = parseUnicreditEc(items);
+              fmts.add('uc-carta');
+            } else if (isUnicreditEc(items)) { st = parseUnicreditEc(items); fmts.add('uc-ec'); }
             else throw new Error(`"${f.name}" non sembra una lista movimenti, un estratto conto o un estratto della carta di credito Unicredit, né un export Satispay.`);
           }
         }
@@ -90,6 +97,10 @@ export function Import({ onDone }: { onDone: () => void }) {
       }
       setBusy('Confronto con i tuoi dati…');
       const p = analyze(rows, state, holder, { from, to });
+      const f = [...fmts].sort().join('+');
+      let saved: string | undefined;
+      try { saved = localStorage.getItem('runway.method.' + f) ?? undefined; } catch { /* */ }
+      setFmt(f); setMethodId(saved && state.methods?.some((x) => x.id === saved && !x.deleted) ? saved : undefined);
       setFiles(info); setD(emptyDecisions()); setPlan(p); setShown(PAGE); setOpen(new Set());
       setFilter(p.items.some((i) => i.status === 'nuovo' && i.reason === 'nessuna') ? 'rivedere' : 'tutti');
     } catch (e: any) {
@@ -215,7 +226,7 @@ export function Import({ onDone }: { onDone: () => void }) {
   const commit = async () => {
     // conferma esplicita: un tocco involontario (es. alla riaccensione dello schermo) non deve importare tutto
     if (!await confirmDialog(`Importare ${toCreate} movimenti${laterCount ? ` (${laterCount} da confermare dopo in Home)` : ''}${recCount ? ` e ${recCount} ricorrenze` : ''}?`, { ok: 'Importa', cancel: 'Non ancora' })) return;
-    const res = buildCommit(plan, d, state);
+    const res = buildCommit(plan, d, state, methodId);
     if (res.recurrences.length) upsertMany('recurrences', res.recurrences);
     if (res.movements.length) upsertMany('movements', res.movements);
     if (res.rules.length) upsertMany('rules', res.rules);
@@ -239,6 +250,13 @@ export function Import({ onDone }: { onDone: () => void }) {
           {laterCount > 0 && <span><strong>{laterCount}</strong> da confermare dopo</span>}
           <span className={undecided.length ? 'warn' : ''}><strong>{undecided.reduce((s, g) => s + g.items.length, 0)}</strong> da rivedere</span>
         </div>
+        <label className="imp-method">
+          <span className="muted small">Metodo di pagamento di questi movimenti</span>
+          <select value={methodId ?? ''} onChange={(e) => pickMethod(e.target.value || undefined)}>
+            <option value="">Non impostato</option>
+            {(state.methods ?? []).filter((x) => !x.deleted).sort((a, b) => a.order - b.order).map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+          </select>
+        </label>
       </section>
 
       {plan.recs.length > 0 && (
