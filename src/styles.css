@@ -206,6 +206,7 @@ button.row:hover { background: var(--surface-2); }
 .date-time { display: flex; gap: 6px; }
 .date-time input[type=date] { flex: 1 1 auto; min-width: 0; }
 .date-time input[type=time] { flex: 0 0 96px; min-width: 0; }
+.date-time .icon-btn { flex: none; }
 .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 @media (max-width: 420px) { .row-2 { grid-template-columns: 1fr; } }
 .amount-row { display: flex; align-items: center; gap: 12px; }

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Briefcase, CalendarRange, Clock, FileText, Sparkle, Trash2 } from 'lucide-react';
+import { Briefcase, CalendarDays, CalendarRange, Clock, FileText, Sparkle, Trash2 } from 'lucide-react';
 import type { Kind, Movement, Split } from '../types';
 import { useStore } from '../data/store';
 import { AccountChips, AmountInput, CategoryGrid, Field, Segmented, Sheet, SplitPicker, Toggle, categoryUsage } from '../components/ui';
@@ -10,6 +10,7 @@ import { fitsKind, myShare, refundOf } from '../lib/stats';
 import { confirmDialog } from '../components/Dialog';
 import { RefundLinks } from '../components/RefundLinks';
 import { PdfPreview } from './DocReview';
+import { calendarUrl, isPhone } from '../lib/links';
 import { propagateCategory, sameMerchantToConfirm, withOldName } from '../import/commit';
 
 export type MovementDraft = Partial<Movement> & { kind?: Kind };
@@ -217,6 +218,12 @@ export function MovementForm({ initial, onClose }: { initial?: MovementDraft; on
           <div className="date-time">
             <input type="date" value={date} onChange={(e) => changeDate(e.target.value)} />
             <input type="time" value={time} onChange={(e) => setTime(e.target.value)} aria-label="Ora (facoltativa)" />
+            {/* solo da telefono: calendario alla data del movimento */}
+            {isPhone && date && (
+              <a className="icon-btn" href={calendarUrl(date, time)} target="_blank" rel="noopener" aria-label="Apri il calendario a questa data" title="Calendario">
+                <CalendarDays size={20} />
+              </a>
+            )}
           </div>
         </Field>
         <Field label="Descrizione"><input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="es. Supermercato" /></Field>
