@@ -202,7 +202,7 @@ export function buildCommit(plan: Plan, d: Decisions, state: AppState): CommitRe
   // 1) già presenti: si collega l'impronta; se vengono da una ricorrenza si correggono importo e data
   for (const it of plan.items) {
     if (it.status !== 'presente' || !it.match || d.skip.has(it.row.bankId)) continue;
-    const m: Movement = { ...it.match, importId: it.row.bankId, notes: it.match.notes || it.row.text || it.row.purpose };
+    const m: Movement = { ...it.match, accountId: it.row.accountId ?? it.match.accountId, importId: it.row.bankId, notes: it.match.notes || it.row.text || it.row.purpose };
     if (!m.time) m.time = it.row.time ?? timeIn(it.row.text);
     if (it.fixMatch) { m.amount = it.amount; m.date = it.row.date; }
     movements.set(m.id, m);

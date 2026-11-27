@@ -38,6 +38,8 @@ export interface Account extends Base {
   checkDate?: string;
   checkBalance?: number;
   voucherValue?: number;
+  /** Conto bancario: riferimenti degli estratti conto importati qui (fine del numero di conto o intestatari), separati da "|". */
+  bankRef?: string;
 }
 
 /** Spesa anticipata da me e rimborsata dal lavoro in busta paga. */

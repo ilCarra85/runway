@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { CheckCircle2, ChevronDown, ChevronRight, FileUp, Repeat, History, Loader2, Undo2 } from 'lucide-react';
+import { CheckCircle2, ChevronDown, ChevronRight, FileUp, Repeat, History, Landmark, Loader2, Undo2 } from 'lucide-react';
 import type { Category, Kind, Split } from '../types';
 import { useStore } from '../data/store';
 import { Badge } from '../components/Icon';
@@ -19,6 +19,9 @@ import { money, uid } from '../lib/format';
 import { alive, fitsKind } from '../lib/stats';
 
 type Filter = 'rivedere' | 'tutti' | 'presenti';
+
+/** Riferimento di un estratto conto per riconoscere il conto: ultime 4 cifre del numero di conto, altrimenti gli intestatari. */
+const bankRefOf = (st: Statement) => st.account ? 'n:' + st.account.slice(-4) : st.holder ? 'h:' + st.holder.replace(/\s+/g, ' ').trim().toUpperCase() : '';
 const PAGE = 40;
 const stamp = (t: number) => new Date(t).toLocaleString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
@@ -33,6 +36,10 @@ export function Import({ onDone }: { onDone: () => void }) {
   const [open, setOpen] = useState<Set<string>>(new Set());
   const [shown, setShown] = useState(PAGE);
   const [result, setResult] = useState<ReturnType<typeof buildCommit>['stats'] | null>(null);
+  // file Unicredit di conto corrente con più conti bancari: si chiede in quale conto vanno prima di analizzarli
+  const [pending, setPending] = useState<{ rows: BankRow[]; info: typeof files; holder: string; from: string; to: string; refs: string[] } | null>(null);
+  const [bankAcc, setBankAcc] = useState('');
+  const banks = state.accounts.filter((a) => a.kind === 'banca' && !a.deleted).sort((a, b) => a.order - b.order);
 
   const cats = useMemo(() => new Map(state.categories.map((c) => [c.id, c])), [state.categories]);
   const last = useMemo(() => lastImport(state), [state]);
@@ -49,7 +56,8 @@ export function Import({ onDone }: { onDone: () => void }) {
 
   const load = async (list: FileList | null) => {
     if (!list?.length) return;
-    setError(''); setPlan(null); setResult(null);
+    setError(''); setPlan(null); setResult(null); setPending(null);
+    const refs: string[] = [];
     const rows: BankRow[] = [];
     const info: typeof files = [];
     let holder = '', from = '', to = '';
@@ -65,7 +73,7 @@ export function Import({ onDone }: { onDone: () => void }) {
         } else {
           const data = await f.arrayBuffer();
           const lines = await pdfLines(data.slice(0));
-          if (isUnicredit(lines)) st = parseUnicredit(lines);
+          if (isUnicredit(lines)) { st = parseUnicredit(lines); refs.push(bankRefOf(st)); }
           else {
             // estratto conto periodico: i movimenti sono nelle prime pagine
             const items = await pdfItems(data.slice(0), 4);
@@ -74,7 +82,7 @@ export function Import({ onDone }: { onDone: () => void }) {
               const acc = state.accounts.find((a) => a.id === 'carta-credito' && !a.deleted)
                 ?? state.accounts.find((a) => a.kind === 'carta' && /credito/i.test(a.name) && !a.deleted);
               st = parseUnicreditCc(items, acc?.id ?? 'carta-credito');
-            } else if (isUnicreditEc(items)) st = parseUnicreditEc(items);
+            } else if (isUnicreditEc(items)) { st = parseUnicreditEc(items); refs.push(bankRefOf(st)); }
             else throw new Error(`"${f.name}" non sembra una lista movimenti, un estratto conto o un estratto della carta di credito Unicredit, né un export Satispay.`);
           }
         }
@@ -88,15 +96,41 @@ export function Import({ onDone }: { onDone: () => void }) {
         if (st.from && (!from || st.from < from)) from = st.from;
         if (st.to && (!to || st.to > to)) to = st.to;
       }
-      setBusy('Confronto con i tuoi dati…');
-      const p = analyze(rows, state, holder, { from, to });
-      setFiles(info); setD(emptyDecisions()); setPlan(p); setShown(PAGE); setOpen(new Set());
-      setFilter(p.items.some((i) => i.status === 'nuovo' && i.reason === 'nessuna') ? 'rivedere' : 'tutti');
+      // conto corrente: con più conti bancari si sceglie quale (proposto quello già usato per lo stesso estratto)
+      if (rows.some((r) => !r.accountId) && banks.length > 1) {
+        const known = banks.find((a) => refs.some((r) => r && (a.bankRef ?? '').split('|').includes(r)));
+        setBankAcc(known?.id ?? banks[0].id);
+        setPending({ rows, info, holder, from, to, refs: refs.filter(Boolean) });
+        return;
+      }
+      runAnalysis(rows, info, holder, from, to);
     } catch (e: any) {
       setError(e?.message || String(e));
     } finally {
       setBusy('');
     }
+  };
+
+  const runAnalysis = (rows: BankRow[], info: typeof files, holder: string, from: string, to: string) => {
+    const p = analyze(rows, state, holder, { from, to });
+    setFiles(info); setD(emptyDecisions()); setPlan(p); setShown(PAGE); setOpen(new Set());
+    setFilter(p.items.some((i) => i.status === 'nuovo' && i.reason === 'nessuna') ? 'rivedere' : 'tutti');
+  };
+
+  // conto scelto: va sui movimenti del conto corrente e si ricorda il riferimento dell'estratto per la prossima volta
+  const confirmAccount = () => {
+    if (!pending) return;
+    const acc = banks.find((a) => a.id === bankAcc);
+    if (!acc) return;
+    const rows = pending.rows.map((r) => (r.accountId ? r : { ...r, accountId: acc.id }));
+    const changes = banks.map((a) => {
+      const have = (a.bankRef ?? '').split('|').filter(Boolean);
+      const next = a.id === acc.id ? [...new Set([...have, ...pending.refs])] : have.filter((r) => !pending.refs.includes(r));
+      return next.join('|') === have.join('|') ? null : { ...a, bankRef: next.join('|') || undefined };
+    }).filter((a): a is NonNullable<typeof a> => !!a);
+    if (changes.length) upsertMany('accounts', changes);
+    setPending(null);
+    runAnalysis(rows, pending.info, pending.holder, pending.from, pending.to);
   };
 
   // gli addebiti delle ricorrenze proposte restano nella loro card, salvo "importa come movimenti singoli"
@@ -144,12 +178,31 @@ export function Import({ onDone }: { onDone: () => void }) {
     );
   }
 
+  if (pending) {
+    return (
+      <div className="page">
+        <section className="card">
+          <h3 className="card-title"><Landmark size={18} /> In quale conto?</h3>
+          <p className="muted small">{pending.info.map((f) => f.name).join(', ')}: in quale conto vanno i movimenti?
+            {pending.refs.length > 0 && ' La scelta viene ricordata per i prossimi estratti dello stesso conto.'}</p>
+          <select value={bankAcc} onChange={(e) => setBankAcc(e.target.value)}>
+            {banks.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+          </select>
+          <div className="row-actions" style={{ marginTop: 12, gap: 8 }}>
+            <button className="btn ghost" onClick={() => setPending(null)}>Annulla</button>
+            <button className="btn primary grow" onClick={confirmAccount}>Continua</button>
+          </div>
+        </section>
+      </div>
+    );
+  }
+
   if (!plan) {
     return (
       <div className="page">
         <section className="card">
           <h3 className="card-title"><FileUp size={18} /> Importa estratto conto</h3>
-          <p className="muted">Carica i PDF "Lista movimenti" o "Estratto conto" di Unicredit, gli estratti della carta di credito Unicredit (vanno nel conto Carta di credito), o gli Excel "Esporta report" di Satispay (vanno nel conto Satispay). Il file viene letto
+          <p className="muted">Carica i PDF "Lista movimenti" o "Estratto conto" di Unicredit (se hai più conti in banca ti chiedo in quale vanno), gli estratti della carta di credito Unicredit (vanno nel conto Carta di credito), o gli Excel "Esporta report" di Satispay (vanno nel conto Satispay). Il file viene letto
             solo su questo dispositivo: non viene inviato a nessuno.</p>
           <ul className="muted small bullets">
             <li>i movimenti già presenti vengono riconosciuti e non duplicati (anche se reimporti lo stesso file);</li>

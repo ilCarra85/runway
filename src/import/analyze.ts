@@ -254,6 +254,7 @@ export function analyze(rows: BankRow[], state: AppState, holder: string, period
   const live = alive(state.movements);
   const imported = new Set(state.movements.filter((m) => m.importId).map((m) => m.importId!));
   const used = new Set<string>();
+  const banks = new Set(state.accounts.filter((a) => a.kind === 'banca' && !a.deleted).map((a) => a.id));
 
   const items: Item[] = uniq.map((row) => {
     const kind: Kind = row.amount < 0 ? 'uscita' : 'entrata';
@@ -266,7 +267,7 @@ export function analyze(rows: BankRow[], state: AppState, holder: string, period
     if (imported.has(row.bankId) || dupOfOther(row.bankId)) { it.status = 'importato'; return it; }
 
     // un movimento di un altro conto (es. Satispay) non va confuso con uno della banca
-    const sameAccount = (m: Movement) => !row.accountId || m.accountId === row.accountId;
+    const sameAccount = (m: Movement) => !row.accountId || m.accountId === row.accountId || (banks.has(row.accountId) && banks.has(m.accountId));
     // 1) movimento identico già inserito a mano (stesso importo, data vicina)
     let best: Movement | undefined, bd = Infinity;
     for (const m of live) {
