@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Briefcase, CalendarRange, Clock, FileText, Sparkle, Trash2 } from 'lucide-react';
+import { Briefcase, CalendarRange, Clock, FileText, Search, Sparkle, Trash2 } from 'lucide-react';
 import type { Kind, Movement, Split } from '../types';
 import { useStore } from '../data/store';
 import { AccountChips, AmountInput, CategoryGrid, Field, Segmented, Sheet, SplitPicker, Toggle, categoryUsage } from '../components/ui';
@@ -258,9 +258,19 @@ export function MovementForm({ initial, onClose }: { initial?: MovementDraft; on
             </a>
           </div>
         )}
-        <Field label="Descrizione">
-          <textarea rows={2} value={description} onChange={(e) => setDescription(e.target.value.replace(/\s*\n\s*/g, ' '))} placeholder="es. Supermercato" />
-        </Field>
+        <div className="field">
+          <span className="field-label label-with-action">
+            <label htmlFor="mov-desc">Descrizione</label>
+            {/* ricerca Google di quanto scritto nella descrizione (es. per capire chi è l'ente) */}
+            {description.trim() && (
+              <a className="label-action" href={`https://www.google.com/search?q=${encodeURIComponent(description.trim())}`}
+                target="_blank" rel="noopener" aria-label="Cerca la descrizione su Google" title="Cerca su Google">
+                <Search size={16} />
+              </a>
+            )}
+          </span>
+          <textarea id="mov-desc" rows={2} value={description} onChange={(e) => setDescription(e.target.value.replace(/\s*\n\s*/g, ' '))} placeholder="es. Supermercato" />
+        </div>
       </div>
 
       <Field label={kind === 'uscita' ? 'Pagato con' : 'Accreditato su'}>

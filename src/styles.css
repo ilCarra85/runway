@@ -206,6 +206,9 @@ button.row:hover { background: var(--surface-2); }
 .when-desc { display: grid; grid-template-columns: minmax(136px, 160px) auto minmax(0, 1fr); gap: 8px; align-items: stretch; }
 .date-time { display: flex; flex-direction: column; gap: 6px; }
 .date-time input { min-width: 0; }
+.label-with-action { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.label-action { display: grid; place-items: center; width: 28px; height: 22px; margin: -4px 0; border-radius: 8px; color: var(--accent-2, var(--accent)); }
+.label-action:active { background: var(--surface-2); }
 .when-desc textarea { flex: 1; resize: none; min-height: 0; }
 .side-btns { align-self: end; display: flex; flex-direction: column; gap: 6px; }
 .side-btn { display: grid; place-items: center; width: 40px; height: 44px; border-radius: 10px; }
