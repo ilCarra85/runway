@@ -11,7 +11,7 @@ import { VoucherCheck, voucherCheckDue, welfareCheckDue } from './VoucherCheck';
 import { WELFARE_CAT } from '../lib/vouchers';
 import {
   NORM_DAYS, NORM_LABEL, PERIODS, alive, buildFlows, dueOccurrences, elapsedDays, firstMovementDate, forecast, makeCtx,
-  monthlySeries, myShare, pendingRefunds, refundOf, periodRange, summarize, type NormUnit, type PeriodKey
+  monthlySeries, myShare, pendingRefunds, accountBalance, refundOf, periodRange, summarize, type NormUnit, type PeriodKey
 } from '../lib/stats';
 import { formatDate, relativeDays, todayISO } from '../lib/dates';
 import { recRefund } from '../lib/recurrence';
@@ -60,7 +60,10 @@ export function Dashboard({ onAdd, goTo }: { onAdd: (d: MovementDraft) => void; 
     kind: 'entrata', categoryId: state.categories.some((c) => c.id === WELFARE_CAT && !c.deleted) ? WELFARE_CAT : undefined,
     accountId: welfare.id, date: todayISO(), description: 'Buoni welfare', split: { mode: 'pct', value: 100 }, planned: false
   });
-  const vouchersDue = voucherCheckDue(buoni);
+  // buoni pasto importati dall'estratto Edenred: si mostra solo il saldo (il controllo conterebbe due volte le spese)
+  const buoniFromFile = !!buoni && state.movements.some((m) => !m.deleted && m.accountId === buoni.id && m.importId?.startsWith('ED:'));
+  const buoniBalance = buoni ? accountBalance(state, buoni.id) : 0;
+  const vouchersDue = !buoniFromFile && voucherCheckDue(buoni);
   const toVerify = alive(state.recurrences).filter((r) => r.toVerify).length;
   const recMap = new Map(state.recurrences.map((r) => [r.id, r]));
   const savingRate = sum.income > 0 ? (sum.saving / sum.income) * 100 : 0;
@@ -171,7 +174,14 @@ export function Dashboard({ onAdd, goTo }: { onAdd: (d: MovementDraft) => void; 
               <span><small>Rimborsi in attesa</small><strong>{money(refundTotal)}</strong><small>{refunds.length} spese</small></span>
             </button>
           )}
-          {buoni && (
+          {buoni && buoniFromFile && (
+            <div className="card mini">
+              <Wallet size={20} />
+              <span><small>Buoni pasto</small><strong>{money(buoniBalance)}</strong>
+                <small>{Math.round(buoniBalance / (buoni.voucherValue || 10))} buoni da {money(buoni.voucherValue || 10)}</small></span>
+            </div>
+          )}
+          {buoni && !buoniFromFile && (
             <button className={`card mini${vouchersDue ? ' warn' : ''}`} onClick={() => setCheckVouchers(true)}>
               <Wallet size={20} />
               <span><small>Buoni pasto</small>

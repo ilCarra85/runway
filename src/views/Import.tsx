@@ -10,6 +10,7 @@ import { isUnicreditCc, parseUnicreditCc } from '../import/unicreditCc';
 import { isUnicredit, parseUnicredit, type BankRow, type Statement } from '../import/unicredit';
 import { readXlsx } from '../import/xlsx';
 import { isSatispay, parseSatispay } from '../import/satispay';
+import { isEdenred, parseEdenred } from '../import/edenred';
 import { analyze, type Item, type Plan } from '../import/analyze';
 import { buildCommit, emptyDecisions, groupKey, heldRows, isLater, itemChoice, lastImport, recView, undoImport, type Decisions, type RecChoice } from '../import/commit';
 import { confirmDialog } from '../components/Dialog';
@@ -67,9 +68,15 @@ export function Import({ onDone }: { onDone: () => void }) {
         let st: Statement;
         if (/\.xlsx$/i.test(f.name)) {
           const cells = await readXlsx(await f.arrayBuffer());
-          if (!isSatispay(cells)) throw new Error(`"${f.name}" non sembra un export di Satispay.`);
-          const acc = state.accounts.find((a) => a.id === 'satispay' && !a.deleted) ?? state.accounts.find((a) => /satispay/i.test(a.name) && !a.deleted);
-          st = parseSatispay(cells, acc?.id ?? 'satispay');
+          if (isEdenred(cells)) {
+            // carta buoni pasto: i movimenti vanno nel conto Buoni pasto
+            const acc = state.accounts.find((a) => a.id === 'buoni' && !a.deleted) ?? state.accounts.find((a) => a.kind === 'buoni' && !a.deleted);
+            st = parseEdenred(cells, acc?.id ?? 'buoni');
+          } else {
+            if (!isSatispay(cells)) throw new Error(`"${f.name}" non sembra un export di Satispay né un estratto della carta Edenred.`);
+            const acc = state.accounts.find((a) => a.id === 'satispay' && !a.deleted) ?? state.accounts.find((a) => /satispay/i.test(a.name) && !a.deleted);
+            st = parseSatispay(cells, acc?.id ?? 'satispay');
+          }
         } else {
           const data = await f.arrayBuffer();
           const lines = await pdfLines(data.slice(0));
@@ -202,7 +209,7 @@ export function Import({ onDone }: { onDone: () => void }) {
       <div className="page">
         <section className="card">
           <h3 className="card-title"><FileUp size={18} /> Importa estratto conto</h3>
-          <p className="muted">Carica i PDF "Lista movimenti" o "Estratto conto" di Unicredit (se hai più conti in banca ti chiedo in quale vanno), gli estratti della carta di credito Unicredit (vanno nel conto Carta di credito), o gli Excel "Esporta report" di Satispay (vanno nel conto Satispay). Il file viene letto
+          <p className="muted">Carica i PDF "Lista movimenti" o "Estratto conto" di Unicredit (se hai più conti in banca ti chiedo in quale vanno), gli estratti della carta di credito Unicredit (vanno nel conto Carta di credito), gli Excel "Esporta report" di Satispay (vanno nel conto Satispay) o l'Excel dei movimenti della carta Edenred (vanno nel conto Buoni pasto). Il file viene letto
             solo su questo dispositivo: non viene inviato a nessuno.</p>
           <ul className="muted small bullets">
             <li>i movimenti già presenti vengono riconosciuti e non duplicati (anche se reimporti lo stesso file);</li>

@@ -140,7 +140,10 @@ function suggest(row: BankRow, kind: Kind, key: string, state: AppState, holderW
   const pick = (id: string, reason: Reason = 'tipo') => { const v = ok(id); return v ? { categoryId: v, reason } : undefined; };
 
   let r: { categoryId: string; reason: Reason; split?: Split } | undefined;
-  if (/^SATISPAY /.test(t)) {
+  // carta buoni pasto Edenred: buoni spostati da un'altra carta = movimento interno; ricariche = entrata Buoni pasto
+  if (/^EDENRED TRASFERIMENTO/.test(t)) r = pick(kind === 'uscita' ? 'giroconto-out' : 'giroconto-in');
+  else if (/^EDENRED RICARICA/.test(t)) r = pick('buoni-pasto-in');
+  else if (/^SATISPAY /.test(t)) {
     // Satispay: ricariche e salvadanaio sono movimenti interni; il resto passa dalle regole e dalle parole chiave
     if (/BANCA|RISPARMI|INVESTIMENTO/.test(t)) r = pick(kind === 'uscita' ? 'giroconto-out' : 'giroconto-in');
     else if (/PREMIO/.test(t)) r = pick('altro-in');
@@ -185,7 +188,7 @@ export const cadenceDays = (every: number, unit: Unit) =>
 
 /** Tipi di operazione da cui possono nascere ricorrenze (non la spesa al supermercato col bancomat). */
 const RECURRING_TYPE = (it: Item) =>
-  !/PRELEVAMENTO|COMMISSIONI|INCASSO POS/.test(it.row.type) && (!/PAGAMENTO POS/.test(it.row.type) || it.row.online);
+  !/PRELEVAMENTO|COMMISSIONI|INCASSO POS|EDENRED/.test(it.row.type) && (!/PAGAMENTO POS/.test(it.row.type) || it.row.online);
 
 /**
  * Cadenza regolare di una serie di date (ordinate).
