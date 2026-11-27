@@ -10,7 +10,7 @@ import { fitsKind, myShare, refundOf } from '../lib/stats';
 import { confirmDialog } from '../components/Dialog';
 import { RefundLinks } from '../components/RefundLinks';
 import { PdfPreview } from './DocReview';
-import { calendarUrl, isPhone } from '../lib/links';
+import { calendarUrl, isPhone, timelineUrl } from '../lib/links';
 import { propagateCategory, sameMerchantToConfirm, withOldName } from '../import/commit';
 
 /** Icona in stile calendario Google: bordi colorati e il giorno del movimento. */
@@ -24,6 +24,18 @@ function CalendarIcon({ day }: { day: number }) {
       <path d="M8 28h20v5H7a4 4 0 0 1-4-4v-1z" fill="#34A853" />
       <path d="M28 27h5v2l-4 4h-1z" fill="#EA4335" />
       <text x="18" y="23.5" textAnchor="middle" fontSize="12" fontWeight="700" fill="#4285F4" fontFamily="Arial, sans-serif">{day}</text>
+    </svg>
+  );
+}
+
+/** Icona «Spostamenti»: percorso a zigzag con freccia e segnaposto di Maps. */
+function TimelineIcon() {
+  return (
+    <svg width="34" height="34" viewBox="0 0 36 36" aria-hidden="true">
+      <path d="M5 31l7-8 6 5 9-11" fill="none" stroke="#4285F4" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M22.5 16.5l5-0.5-0.5 5" fill="none" stroke="#4285F4" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M24 2.5a6.5 6.5 0 0 0-6.5 6.5c0 4.6 6.5 10.5 6.5 10.5s6.5-5.9 6.5-10.5A6.5 6.5 0 0 0 24 2.5z" fill="#EA4335" />
+      <circle cx="24" cy="9" r="2.4" fill="#fff" />
     </svg>
   );
 }
@@ -237,9 +249,14 @@ export function MovementForm({ initial, onClose }: { initial?: MovementDraft; on
           </div>
         </Field>
         {isPhone && date && (
-          <a className="cal-btn" href={calendarUrl(date, time)} target="_blank" rel="noopener" aria-label="Apri il calendario a questa data" title="Calendario">
-            <CalendarIcon day={Number(date.slice(8, 10))} />
-          </a>
+          <div className="side-btns">
+            <a className="side-btn" href={calendarUrl(date, time)} target="_blank" rel="noopener" aria-label="Apri il calendario a questa data" title="Calendario">
+              <CalendarIcon day={Number(date.slice(8, 10))} />
+            </a>
+            <a className="side-btn" href={timelineUrl(date)} target="_blank" rel="noopener" aria-label="Apri gli spostamenti di Google Maps a questa data" title="Spostamenti">
+              <TimelineIcon />
+            </a>
+          </div>
         )}
         <Field label="Descrizione">
           <textarea rows={2} value={description} onChange={(e) => setDescription(e.target.value.replace(/\s*\n\s*/g, ' '))} placeholder="es. Supermercato" />

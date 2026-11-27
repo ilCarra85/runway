@@ -207,8 +207,9 @@ button.row:hover { background: var(--surface-2); }
 .date-time { display: flex; flex-direction: column; gap: 6px; }
 .date-time input { min-width: 0; }
 .when-desc textarea { flex: 1; resize: none; min-height: 0; }
-.cal-btn { align-self: end; margin-bottom: 28px; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 10px; }
-.cal-btn:active { background: var(--surface-2); }
+.side-btns { align-self: end; display: flex; flex-direction: column; gap: 6px; }
+.side-btn { display: grid; place-items: center; width: 40px; height: 44px; border-radius: 10px; }
+.side-btn:active { background: var(--surface-2); }
 .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 @media (max-width: 420px) { .row-2 { grid-template-columns: 1fr; } }
 .amount-row { display: flex; align-items: center; gap: 12px; }
