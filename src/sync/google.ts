@@ -23,7 +23,7 @@ export const TABS: Record<Collection, string> = {
 const COLUMNS: Record<Collection, string[]> = {
   movements: ['id', 'date', 'kind', 'amount', 'categoryId', 'accountId', 'description', 'splitMode', 'splitValue', 'refund',
     'refundIncomeId', 'compFrom', 'compTo', 'planned', 'recurrenceId', 'occurrence', 'notes', 'demo', 'createdAt', 'updatedAt', 'deleted', 'refundAmount', 'importId', 'docFileId', 'docName', 'mealVouchers', 'refundIn', 'toConfirm', 'extraordinary', 'time', 'importKey'],
-  categories: ['id', 'name', 'icon', 'color', 'kind', 'group', 'splitMode', 'splitValue', 'order', 'excluded', 'updatedAt', 'deleted'],
+  categories: ['id', 'name', 'icon', 'color', 'kind', 'group', 'splitMode', 'splitValue', 'order', 'excluded', 'updatedAt', 'deleted', 'noForecast'],
   accounts: ['id', 'name', 'icon', 'kind', 'order', 'updatedAt', 'deleted', 'checkDate', 'checkBalance', 'voucherValue', 'bankRef'],
   recurrences: ['id', 'name', 'kind', 'amount', 'categoryId', 'accountId', 'splitMode', 'splitValue', 'every', 'unit', 'start', 'endMode',
     'count', 'until', 'active', 'toVerify', 'skipped', 'driveFolderId', 'driveFolderName', 'notes', 'updatedAt', 'deleted', 'confirm', 'docTemplate', 'docSupply', 'docIgnored', 'refundable', 'refundAmount', 'amountAuto', 'refundIn', 'docDate'],
@@ -32,7 +32,7 @@ const COLUMNS: Record<Collection, string[]> = {
 };
 
 const NUM = new Set(['amount', 'refundAmount', 'splitValue', 'order', 'every', 'count', 'createdAt', 'updatedAt', 'mealVouchers', 'checkBalance', 'voucherValue', 'rows', 'at']);
-const BOOL = new Set(['planned', 'demo', 'deleted', 'excluded', 'active', 'toVerify', 'confirm', 'refundable', 'amountAuto', 'refundIn', 'docDate', 'toConfirm', 'undone', 'extraordinary']);
+const BOOL = new Set(['noForecast', 'planned', 'demo', 'deleted', 'excluded', 'active', 'toVerify', 'confirm', 'refundable', 'amountAuto', 'refundIn', 'docDate', 'toConfirm', 'undone', 'extraordinary']);
 const JSONF = new Set(['skipped', 'docIgnored']);
 
 // ---------- Token ----------

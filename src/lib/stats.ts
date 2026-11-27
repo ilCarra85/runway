@@ -88,7 +88,9 @@ export function buildFlows(state: AppState, from: string, to: string, opt: FlowO
     const a = maxISO(from, addDays(today, 1));
     if (a <= to) {
       for (const r of alive(state.recurrences)) {
-        if (!r.active || ctx.cats.get(r.categoryId)?.excluded) continue;
+        // occorrenze future = stima: non per le categorie escluse dalle statistiche o dalle previsioni
+        const rc = ctx.cats.get(r.categoryId);
+        if (!r.active || rc?.excluded || rc?.noForecast) continue;
         for (const d of occurrencesBetween(r, a, to)) {
           if (ctx.registered.has(`${r.id}|${d}`)) continue;
           flows.push({ kind: r.kind, categoryId: r.categoryId, mine: myShare(r.amount, r.split), source: 'ricorrente' });
@@ -224,7 +226,7 @@ export function forecast(state: AppState, months = 12, extra = 0): Forecast {
   const vFrom = addDays(addMonths(t, -6), 1);
   let varOut = 0, varIn = 0;
   for (const m of state.movements) {
-    if (m.deleted || m.planned || m.extraordinary || covered.has(m.categoryId)) continue;
+    if (m.deleted || m.planned || m.extraordinary || covered.has(m.categoryId) || ctx.cats.get(m.categoryId)?.noForecast) continue;
     const f = allocation(m, vFrom, t);
     if (!f) continue;
     const v = effectiveMine(m, ctx) * f;

@@ -26,6 +26,8 @@ export interface Category extends Base {
   order: number;
   /** Non conta nelle statistiche (es. giroconti, ricariche Satispay). */
   excluded?: boolean;
+  /** Conta nelle statistiche ma non viene stimata nella previsione dei periodi successivi (media e ricorrenze future). */
+  noForecast?: boolean;
 }
 
 export type AccountKind = 'banca' | 'app' | 'buoni' | 'welfare' | 'contanti' | 'carta';

@@ -1,21 +1,21 @@
 import { useState } from 'react';
-import { ChevronLeft, ChevronRight, Cloud, CloudAlert, CloudOff, FileUp, House, Landmark, List, LogIn, Menu, Plus, RefreshCw, Repeat, Settings as Cog, Store, Tags } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Cloud, CloudAlert, CloudOff, FileUp, House, Landmark, Layers, List, LogIn, Menu, Plus, RefreshCw, Repeat, Settings as Cog, Store, Tags } from 'lucide-react';
 import { useStore } from './data/store';
 import { Dashboard } from './views/Dashboard';
 import { Movements } from './views/Movements';
 import { MovementForm, type MovementDraft } from './views/MovementForm';
 import { Recurrences } from './views/Recurrences';
-import { Accounts, Categories } from './views/Categories';
+import { Accounts, Categories, Groups } from './views/Categories';
 import { Settings } from './views/Settings';
 import { Merchants } from './views/Merchants';
 import { Import } from './views/Import';
 import { DialogHost } from './components/Dialog';
 
 type Tab = 'home' | 'movimenti' | 'ricorrenze' | 'altro';
-type Sub = null | 'categorie' | 'conti' | 'enti' | 'impostazioni' | 'importa';
+type Sub = null | 'categorie' | 'gruppi' | 'conti' | 'enti' | 'impostazioni' | 'importa';
 
 const TITLES: Record<Tab, string> = { home: 'Runway', movimenti: 'Movimenti', ricorrenze: 'Ricorrenze', altro: 'Altro' };
-const SUB_TITLES: Record<Exclude<Sub, null>, string> = { categorie: 'Categorie', conti: 'Conti e portafogli', enti: 'Enti e descrizioni', impostazioni: 'Impostazioni', importa: 'Importa estratto conto' };
+const SUB_TITLES: Record<Exclude<Sub, null>, string> = { categorie: 'Categorie', gruppi: 'Gruppi di categorie', conti: 'Conti e portafogli', enti: 'Enti e descrizioni', impostazioni: 'Impostazioni', importa: 'Importa estratto conto' };
 
 export default function App() {
   const { sync } = useStore();
@@ -54,6 +54,7 @@ export default function App() {
             <div className="card list">
               {([['importa', FileUp, 'Importa estratto conto', 'PDF della banca: movimenti, ricorrenze e categorie'],
                  ['categorie', Tags, 'Categorie', 'Icone, colori e ripartizione predefinita'],
+                 ['gruppi', Layers, 'Gruppi di categorie', 'Rinomina o elimina i gruppi'],
                  ['conti', Landmark, 'Conti e portafogli', 'Conto corrente, Satispay, buoni pasto…'],
                  ['enti', Store, 'Enti e descrizioni', 'Descrizione da dare ai movimenti di un ente'],
                  ['impostazioni', Cog, 'Impostazioni', 'Sincronizzazione Google, backup, dati di esempio']] as const).map(([k, I, t, d]) => (
@@ -68,6 +69,7 @@ export default function App() {
           </div>
         )}
         {tab === 'altro' && sub === 'categorie' && <Categories />}
+        {tab === 'altro' && sub === 'gruppi' && <Groups />}
         {tab === 'altro' && sub === 'conti' && <Accounts />}
         {tab === 'altro' && sub === 'enti' && <Merchants />}
         {tab === 'altro' && sub === 'impostazioni' && <Settings />}

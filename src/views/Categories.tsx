@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { EyeOff, Plus, Trash2 } from 'lucide-react';
+import { EyeOff, Plus, TrendingUp, Trash2 } from 'lucide-react';
 import type { Account, AccountKind, AppState, Category, CategoryKind, Kind, Split } from '../types';
 import { useStore } from '../data/store';
 import { Badge, ICONS, Icon } from '../components/Icon';
@@ -49,6 +49,7 @@ export function Categories() {
                     <span className="row-tags">
                       <SplitBadge split={c.split} />
                       {c.excluded && <span className="tag"><EyeOff size={12} /> Esclusa dalle statistiche</span>}
+                      {!c.excluded && c.noForecast && <span className="tag"><TrendingUp size={12} /> Esclusa dalle previsioni</span>}
                     </span>
                   </span>
                 </button>
@@ -74,6 +75,7 @@ function CategoryForm({ initial, kind: k0, onClose }: { initial?: Category; kind
   const [color, setColor] = useState(initial?.color ?? COLORS[0]);
   const [split, setSplit] = useState<Split>(initial?.split ?? { mode: 'pct', value: 100 });
   const [excluded, setExcluded] = useState(!!initial?.excluded);
+  const [noForecast, setNoForecast] = useState(!!initial?.noForecast);
   const groups = [...new Set(state.categories.filter((c) => !c.deleted).map((c) => c.group).filter(Boolean))].sort((a, b) => a.localeCompare(b));
   // gruppo esistente dal menu, oppure uno nuovo scritto a mano
   const [newGroup, setNewGroup] = useState(!!initial?.group && !groups.includes(initial.group));
@@ -83,7 +85,7 @@ function CategoryForm({ initial, kind: k0, onClose }: { initial?: Category; kind
     if (!name.trim()) return;
     if (initial && !(await kindChangeOk(state, initial, kind))) return;
     upsert('categories', {
-      id: initial?.id ?? uid(), name: name.trim(), kind, group: group.trim() || 'Altro', icon, color, split, excluded: excluded || undefined,
+      id: initial?.id ?? uid(), name: name.trim(), kind, group: group.trim() || 'Altro', icon, color, split, excluded: excluded || undefined, noForecast: noForecast || undefined,
       order: initial?.order ?? Math.max(0, ...state.categories.map((c) => c.order)) + 1, updatedAt: Date.now()
     });
     onClose();
@@ -122,7 +124,10 @@ function CategoryForm({ initial, kind: k0, onClose }: { initial?: Category; kind
       <Field label="Ripartizione predefinita" hint="Proposta automaticamente quando scegli questa categoria">
         <SplitPicker split={split} onChange={setSplit} amount={0} kind={kind === 'entrata' ? 'entrata' : 'uscita'} />
       </Field>
-      <Toggle checked={excluded} onChange={setExcluded} icon={<EyeOff size={20} />} label="Escludi dalle statistiche" hint="Per giroconti e ricariche (es. ricarica Satispay dal conto)" />
+      <Toggle checked={excluded} onChange={setExcluded} icon={<EyeOff size={20} />} label="Escludi dalle statistiche"
+        hint="Non conta nelle entrate/uscite, né nei periodi passati né nelle previsioni (es. giroconti e ricariche)" />
+      <Toggle checked={excluded || noForecast} onChange={setNoForecast} icon={<TrendingUp size={20} />} label="Escludi dalle previsioni"
+        hint={excluded ? 'Già esclusa: non conta nelle statistiche' : 'Conta nei periodi passati e in corso, ma non viene stimata per i periodi successivi'} />
     </Sheet>
   );
 }
@@ -168,6 +173,83 @@ export function Accounts() {
           <Field label="Icona"><div className="icon-picker">{['Landmark', 'CreditCard', 'Smartphone', 'Wallet', 'Banknote', 'PiggyBank', 'Coins', 'HandCoins'].map((n) => (
             <button key={n} type="button" className={`icon-opt ${n === icon ? 'on' : ''}`} onClick={() => setIcon(n)} aria-label={n}><Icon name={n} size={20} /></button>
           ))}</div></Field>
+        </Sheet>
+      )}
+    </div>
+  );
+}
+
+const NEW_GROUP_TARGET = '__nuovo__';
+
+/** Altro → Gruppi di categorie: rinomina un gruppo (vale per tutte le sue categorie) o lo elimina spostandole in un altro. */
+export function Groups() {
+  const { state, upsertMany } = useStore();
+  const groups = groupCategories(state.categories.filter((x) => !x.deleted));
+  const [edit, setEdit] = useState<string | null>(null);
+  const [name, setName] = useState('');
+  const [deleting, setDeleting] = useState(false);
+  const [target, setTarget] = useState('');
+  const [newName, setNewName] = useState('');
+  const cats = edit !== null ? state.categories.filter((x) => !x.deleted && x.group === edit) : [];
+  const others = groups.map(([g]) => g).filter((g) => g !== edit);
+
+  const open = (g: string) => { setEdit(g); setName(g); setDeleting(false); setTarget(others.find((x) => x !== g) ?? NEW_GROUP_TARGET); setNewName(''); };
+  const moveTo = (to: string) => {
+    const now = Date.now();
+    if (cats.length) upsertMany('categories', cats.map((x) => ({ ...x, group: to, updatedAt: now })));
+    setEdit(null);
+  };
+  const save = () => {
+    const n = name.trim();
+    if (!n || edit === null) return;
+    if (n !== edit) moveTo(n); else setEdit(null);
+  };
+  const doDelete = () => {
+    const to = target === NEW_GROUP_TARGET ? newName.trim() : target;
+    if (!to) return;
+    moveTo(to);
+  };
+  const merging = !!edit && name.trim() !== edit && others.includes(name.trim());
+
+  return (
+    <div className="page">
+      <div className="card list">
+        {groups.map(([g, cs]) => (
+          <button key={g} className="row" onClick={() => open(g)}>
+            <span className="row-main">
+              <span className="row-title">{g}</span>
+              <span className="row-sub">{cs.length} {cs.length === 1 ? 'categoria' : 'categorie'}: {cs.map((x) => x.name).join(', ')}</span>
+            </span>
+          </button>
+        ))}
+        {!groups.length && <p className="muted small center">Nessun gruppo</p>}
+      </div>
+      <p className="muted small center">Un gruppo nuovo si crea dalla categoria (Gruppo → Nuovo gruppo…).</p>
+      {edit !== null && !deleting && (
+        <Sheet title="Modifica gruppo" onClose={() => setEdit(null)} footer={<>
+          <button className="btn ghost danger" onClick={() => setDeleting(true)}><Trash2 size={18} /> Elimina</button>
+          <button className="btn primary grow" onClick={save} disabled={!name.trim()}>Salva</button>
+        </>}>
+          <Field label="Nome" hint={merging ? `Esiste già: le categorie di «${edit}» passano in «${name.trim()}».` : `Vale per le ${cats.length} categorie del gruppo.`}>
+            <input value={name} onChange={(e) => setName(e.target.value)} />
+          </Field>
+        </Sheet>
+      )}
+      {edit !== null && deleting && (
+        <Sheet title={`Eliminare «${edit}»?`} onClose={() => setDeleting(false)} footer={<>
+          <button className="btn ghost" onClick={() => setDeleting(false)}>Annulla</button>
+          <button className="btn primary danger grow" onClick={doDelete} disabled={target === NEW_GROUP_TARGET && !newName.trim()}><Trash2 size={18} /> Elimina</button>
+        </>}>
+          <p className="small">Le sue <strong>{cats.length}</strong> categorie ({cats.map((x) => x.name).join(', ')}) non vengono eliminate: in quale gruppo le sposto?</p>
+          <Field label="Sposta in">
+            <select value={target} onChange={(e) => setTarget(e.target.value)}>
+              {others.map((g) => <option key={g} value={g}>{g}</option>)}
+              <option value={NEW_GROUP_TARGET}>Nuovo gruppo…</option>
+            </select>
+          </Field>
+          {target === NEW_GROUP_TARGET && (
+            <Field label="Nome del nuovo gruppo"><input value={newName} onChange={(e) => setNewName(e.target.value)} autoFocus /></Field>
+          )}
         </Sheet>
       )}
     </div>
