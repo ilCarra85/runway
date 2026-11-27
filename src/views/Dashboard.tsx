@@ -45,7 +45,9 @@ export function Dashboard({ onAdd, goTo }: { onAdd: (d: MovementDraft) => void; 
   const due = useMemo(() => dueOccurrences(state), [state]);
   // movimenti importati lasciati in sospeso (quelli delle ricorrenze sono già tra le scadenze)
   const toConfirm = useMemo(() => alive(state.movements).filter((m) => m.toConfirm && !m.recurrenceId)
-    .sort((a, b) => a.date.localeCompare(b.date)), [state.movements]);
+    // per ente (descrizione, in ordine alfabetico), poi per data e ora crescenti
+    .sort((a, b) => a.description.localeCompare(b.description, 'it', { sensitivity: 'base' })
+      || a.date.localeCompare(b.date) || (a.time ?? '').localeCompare(b.time ?? '')), [state.movements]);
   const [allToConfirm, setAllToConfirm] = useState(false);
   const refunds = pendingRefunds(state);
   const refundTotal = refunds.reduce((s, m) => s + refundOf(m), 0);
