@@ -21,5 +21,7 @@ export function calendarUrl(date: string, time?: string): string {
   // oltre all'indirizzo con l'orario si passa anche "beginTime" (letto dall'app per scegliere il giorno da mostrare)
   return `intent://com.android.calendar/time/${ms}#Intent;scheme=content;action=android.intent.action.VIEW;`
     + `package=com.google.android.calendar;l.beginTime=${ms};l.endTime=${ms + 3600000};`
+    // vista giorno invece di quella predefinita (extra "VIEW"/"DETAIL_VIEW" del calendario Android)
+    + `S.VIEW=DAY;B.DETAIL_VIEW=true;`
     + `S.browser_fallback_url=${encodeURIComponent(web)};end`;
 }
