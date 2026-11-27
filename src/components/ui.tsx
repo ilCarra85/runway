@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { X } from 'lucide-react';
-import type { Account, Category, Kind, Split, PayMethod } from '../types';
+import type { Account, Category, Kind, Split } from '../types';
 import { Badge, Icon } from './Icon';
 import { GROUP_ORDER } from '../data/seed';
 import { amountToInput, money, parseAmount } from '../lib/format';
@@ -125,21 +125,6 @@ export function groupCategories(list: Category[]): [string, Category[]][] {
   }
   const rank = (g: string) => { const i = GROUP_ORDER.indexOf(g); return i < 0 ? 99 : i; };
   return [...m.entries()].sort((a, b) => rank(a[0]) - rank(b[0]));
-}
-
-/** Metodo di pagamento facoltativo: "Nessuno" = non impostato. */
-export function MethodChips({ methods, value, onChange }: { methods: PayMethod[]; value?: string; onChange: (id: string | undefined) => void }) {
-  const list = methods.filter((m) => !m.deleted || m.id === value).sort((a, b) => a.order - b.order);
-  return (
-    <div className="chips">
-      <button type="button" className={`chip ${!value ? 'on' : ''}`} onClick={() => onChange(undefined)} aria-pressed={!value}>Nessuno</button>
-      {list.map((m) => (
-        <button key={m.id} type="button" className={`chip ${value === m.id ? 'on' : ''}`} onClick={() => onChange(m.id)} aria-pressed={value === m.id}>
-          <Icon name={m.icon} size={16} /> {m.name}
-        </button>
-      ))}
-    </div>
-  );
 }
 
 export function AccountChips({ accounts, value, onChange }: { accounts: Account[]; value: string; onChange: (id: string) => void }) {

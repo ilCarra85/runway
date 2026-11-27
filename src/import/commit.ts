@@ -157,7 +157,7 @@ export function propagateCategory(state: AppState, before: Movement, after: Move
   return { movements, rule: { id: ex?.id ?? uid(), key, kind: before.kind, categoryId: after.categoryId, split, updatedAt: Date.now() } };
 }
 
-export function buildCommit(plan: Plan, d: Decisions, state: AppState, methodId?: string): CommitResult {
+export function buildCommit(plan: Plan, d: Decisions, state: AppState): CommitResult {
   const now = Date.now();
   const cats = new Map(state.categories.map((c) => [c.id, c]));
   const account = state.accounts.find((a) => a.id === 'conto' && !a.deleted)?.id
@@ -168,7 +168,7 @@ export function buildCommit(plan: Plan, d: Decisions, state: AppState, methodId?
   let created = 0, updated = 0;
 
   const newMovement = (it: Item, categoryId: string, split: Split, extra: Partial<Movement> = {}): Movement => ({
-    id: uid(), kind: it.kind, amount: it.amount, categoryId, accountId: it.row.accountId ?? account, date: it.row.date, time: it.row.time ?? timeIn(it.row.text), methodId,
+    id: uid(), kind: it.kind, amount: it.amount, categoryId, accountId: it.row.accountId ?? account, date: it.row.date, time: it.row.time ?? timeIn(it.row.text),
     description: d.rowDesc.get(it.row.bankId)?.trim() || it.name, notes: it.row.text || it.row.purpose, split, refund: 'none', planned: false,
     importId: it.row.bankId, importKey: it.key, createdAt: now, updatedAt: now, ...extra
   });
@@ -178,7 +178,6 @@ export function buildCommit(plan: Plan, d: Decisions, state: AppState, methodId?
     if (it.status !== 'presente' || !it.match || d.skip.has(it.row.bankId)) continue;
     const m: Movement = { ...it.match, importId: it.row.bankId, notes: it.match.notes || it.row.text || it.row.purpose };
     if (!m.time) m.time = it.row.time ?? timeIn(it.row.text);
-    if (!m.methodId && methodId) m.methodId = methodId;
     if (it.fixMatch) { m.amount = it.amount; m.date = it.row.date; }
     movements.set(m.id, m);
     updated++;

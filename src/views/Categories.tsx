@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { EyeOff, Plus, Trash2 } from 'lucide-react';
-import type { PayMethod, Account, AccountKind, AppState, Category, CategoryKind, Kind, Split } from '../types';
+import type { Account, AccountKind, AppState, Category, CategoryKind, Kind, Split } from '../types';
 import { useStore } from '../data/store';
 import { Badge, ICONS, Icon } from '../components/Icon';
 import { Field, Segmented, Sheet, SplitBadge, SplitPicker, Toggle, groupCategories } from '../components/ui';
@@ -162,92 +162,3 @@ export function Accounts() {
     </div>
   );
 }
-
-const METHOD_ICONS = ['CreditCard', 'Smartphone', 'Landmark', 'ArrowLeftRight', 'Banknote', 'Wallet', 'Users', 'Coins', 'HandCoins', 'Receipt'];
-
-/** Elenco dei metodi di pagamento (facoltativi sul movimento, proposti all'import). */
-export function Methods() {
-  const { state, upsert, upsertMany, remove } = useStore();
-  const [edit, setEdit] = useState<PayMethod | 'new' | null>(null);
-  const [name, setName] = useState('');
-  const [icon, setIcon] = useState('CreditCard');
-  // eliminazione: con cosa sostituire il metodo nei movimenti che lo usano ('' = nessuno, NEW = nuovo metodo)
-  const [deleting, setDeleting] = useState(false);
-  const [repl, setRepl] = useState('');
-  const [newName, setNewName] = useState('');
-  const list = (state.methods ?? []).filter((m) => !m.deleted).sort((a, b) => a.order - b.order);
-  const nextOrder = () => Math.max(-1, ...(state.methods ?? []).map((m) => m.order)) + 1;
-  const open = (m: PayMethod | 'new') => {
-    setEdit(m); setName(m === 'new' ? '' : m.name); setIcon(m === 'new' ? 'CreditCard' : m.icon);
-    setDeleting(false); setRepl(''); setNewName('');
-  };
-  const save = () => {
-    if (!name.trim() || !edit) return;
-    upsert('methods', { id: edit === 'new' ? uid() : edit.id, name: name.trim(), icon, order: edit === 'new' ? nextOrder() : edit.order, updatedAt: Date.now() });
-    setEdit(null);
-  };
-  const using = edit && edit !== 'new' ? state.movements.filter((m) => !m.deleted && m.methodId === edit.id) : [];
-  const doDelete = () => {
-    if (!edit || edit === 'new') return;
-    let to: string | undefined = repl || undefined;
-    if (repl === NEW_METHOD) {
-      const n = newName.trim();
-      if (!n) return;
-      // se esiste già un metodo con quel nome si usa quello
-      const same = list.find((m) => m.id !== edit.id && m.name.toLowerCase() === n.toLowerCase());
-      to = same?.id ?? uid();
-      if (!same) upsert('methods', { id: to, name: n, icon: edit.icon, order: nextOrder(), updatedAt: Date.now() });
-    }
-    if (using.length) upsertMany('movements', using.map((m) => ({ ...m, methodId: to })));
-    remove('methods', edit.id);
-    setEdit(null);
-  };
-  return (
-    <div className="page">
-      <div className="page-actions"><button className="btn primary" onClick={() => open('new')}><Plus size={18} /> Nuovo metodo</button></div>
-      <div className="card list">
-        {list.map((m) => (
-          <button key={m.id} className="row" onClick={() => open(m)}>
-            <Badge icon={m.icon} color="#64748b" />
-            <span className="row-main"><span className="row-title">{m.name}</span></span>
-          </button>
-        ))}
-        {!list.length && <p className="muted small center">Nessun metodo di pagamento</p>}
-      </div>
-      <p className="muted small center">Il metodo è facoltativo sul movimento e si può scegliere per tutti i movimenti di un file all'import.</p>
-      {edit && !deleting && (
-        <Sheet title={edit === 'new' ? 'Nuovo metodo di pagamento' : 'Modifica metodo di pagamento'} onClose={() => setEdit(null)} footer={<>
-          {edit !== 'new' && <button className="btn ghost danger" onClick={() => setDeleting(true)}><Trash2 size={18} /> Elimina</button>}
-          <button className="btn primary grow" onClick={save}>Salva</button>
-        </>}>
-          <Field label="Nome"><input value={name} onChange={(e) => setName(e.target.value)} placeholder="es. Conto cointestato" /></Field>
-          <Field label="Icona"><div className="icon-picker">{METHOD_ICONS.map((n) => (
-            <button key={n} type="button" className={`icon-opt ${n === icon ? 'on' : ''}`} onClick={() => setIcon(n)} aria-label={n}><Icon name={n} size={20} /></button>
-          ))}</div></Field>
-        </Sheet>
-      )}
-      {edit && edit !== 'new' && deleting && (
-        <Sheet title={`Eliminare «${edit.name}»?`} onClose={() => setDeleting(false)} footer={<>
-          <button className="btn ghost" onClick={() => setDeleting(false)}>Annulla</button>
-          <button className="btn danger-solid grow" onClick={doDelete} disabled={repl === NEW_METHOD && !newName.trim()}><Trash2 size={18} /> Elimina</button>
-        </>}>
-          {using.length ? <>
-            <p className="small">Lo usano <strong>{using.length}</strong> {using.length === 1 ? 'movimento' : 'movimenti'}. Con cosa lo sostituisco?</p>
-            <Field label="Sostituisci con">
-              <select value={repl} onChange={(e) => setRepl(e.target.value)}>
-                <option value="">Nessun metodo</option>
-                {list.filter((m) => m.id !== edit.id).map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-                <option value={NEW_METHOD}>Nuovo metodo…</option>
-              </select>
-            </Field>
-            {repl === NEW_METHOD && (
-              <Field label="Nome del nuovo metodo"><input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="es. Conto cointestato" autoFocus /></Field>
-            )}
-          </> : <p className="small">Nessun movimento usa questo metodo.</p>}
-        </Sheet>
-      )}
-    </div>
-  );
-}
-
-const NEW_METHOD = '__nuovo__';

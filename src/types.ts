@@ -28,13 +28,6 @@ export interface Category extends Base {
   excluded?: boolean;
 }
 
-/** Metodo di pagamento (es. carta di credito, Genius Pay): elenco personalizzabile, facoltativo sul movimento. */
-export interface PayMethod extends Base {
-  name: string;
-  icon: string;
-  order: number;
-}
-
 export type AccountKind = 'banca' | 'app' | 'buoni' | 'welfare' | 'contanti' | 'carta';
 export interface Account extends Base {
   name: string;
@@ -54,8 +47,6 @@ export interface Movement extends Base {
   date: string; // YYYY-MM-DD
   /** Orario (HH:MM), se noto (es. letto dall'estratto conto). */
   time?: string;
-  /** Metodo di pagamento (facoltativo). */
-  methodId?: string;
   kind: Kind;
   amount: number; // importo totale, sempre positivo
   categoryId: string;
@@ -175,9 +166,8 @@ export interface AppState {
   recurrences: Recurrence[];
   rules: Rule[];
   imports: ImportLog[];
-  methods: PayMethod[];
   settings: Settings;
 }
 
-export type Collection = 'categories' | 'accounts' | 'movements' | 'recurrences' | 'rules' | 'imports' | 'methods';
-export type Entity = Category | Account | Movement | Recurrence | Rule | ImportLog | PayMethod;
+export type Collection = 'categories' | 'accounts' | 'movements' | 'recurrences' | 'rules' | 'imports';
+export type Entity = Category | Account | Movement | Recurrence | Rule | ImportLog;

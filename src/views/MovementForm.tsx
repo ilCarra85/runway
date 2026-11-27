@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Briefcase, CalendarRange, Clock, FileText, Sparkle, Trash2 } from 'lucide-react';
 import type { Kind, Movement, Split } from '../types';
 import { useStore } from '../data/store';
-import { AccountChips, MethodChips, AmountInput, CategoryGrid, Field, Segmented, Sheet, SplitPicker, Toggle, categoryUsage } from '../components/ui';
+import { AccountChips, AmountInput, CategoryGrid, Field, Segmented, Sheet, SplitPicker, Toggle, categoryUsage } from '../components/ui';
 import { amountToInput, money, parseAmount, uid } from '../lib/format';
 import { endOfMonth, formatDate, todayISO } from '../lib/dates';
 import { Badge } from '../components/Icon';
@@ -23,7 +23,6 @@ export function MovementForm({ initial, onClose }: { initial?: MovementDraft; on
   const [accountId, setAccountId] = useState(initial?.accountId ?? 'conto');
   const [date, setDate] = useState(initial?.date ?? todayISO());
   const [time, setTime] = useState(initial?.time ?? '');
-  const [methodId, setMethodId] = useState<string | undefined>(initial?.methodId);
   const [description, setDescription] = useState(initial?.description ?? '');
   const [split, setSplit] = useState<Split>(initial?.split ?? { mode: 'pct', value: 100 });
   const [splitTouched, setSplitTouched] = useState(!!initial?.split);
@@ -101,7 +100,7 @@ export function MovementForm({ initial, onClose }: { initial?: MovementDraft; on
     const m: Movement = {
       // campi non modificabili qui (documento, import, buoni pasto) restano quelli del movimento
       importId: initial?.importId, docFileId: initial?.docFileId, docName: initial?.docName, mealVouchers: initial?.mealVouchers,
-      id, kind, amount: value, categoryId, accountId, date, time: time || undefined, methodId,
+      id, kind, amount: value, categoryId, accountId, date, time: time || undefined,
       description: description.trim() || cat?.name || '',
       split, refund: kind === 'uscita' && refund !== 'none' ? (incomeId ? 'reimbursed' : 'pending') : 'none',
       refundAmount: kind === 'uscita' && refund !== 'none' ? refundAmount : undefined,
@@ -176,10 +175,6 @@ export function MovementForm({ initial, onClose }: { initial?: MovementDraft; on
 
       <Field label={kind === 'uscita' ? 'Pagato con' : 'Accreditato su'}>
         <AccountChips accounts={state.accounts} value={accountId} onChange={setAccountId} />
-      </Field>
-
-      <Field label="Metodo di pagamento">
-        <MethodChips methods={state.methods ?? []} value={methodId} onChange={setMethodId} />
       </Field>
 
       <Field label="Ripartizione" hint={cat && cat.split.value !== 100 ? `Predefinita per ${cat.name}` : undefined}>

@@ -17,20 +17,18 @@ export const TABS: Record<Collection, string> = {
   accounts: 'Conti',
   recurrences: 'Ricorrenze',
   rules: 'Regole',
-  imports: 'Import',
-  methods: 'Metodi'
+  imports: 'Import'
 };
 
 const COLUMNS: Record<Collection, string[]> = {
   movements: ['id', 'date', 'kind', 'amount', 'categoryId', 'accountId', 'description', 'splitMode', 'splitValue', 'refund',
-    'refundIncomeId', 'compFrom', 'compTo', 'planned', 'recurrenceId', 'occurrence', 'notes', 'demo', 'createdAt', 'updatedAt', 'deleted', 'refundAmount', 'importId', 'docFileId', 'docName', 'mealVouchers', 'refundIn', 'toConfirm', 'extraordinary', 'time', 'methodId', 'importKey'],
+    'refundIncomeId', 'compFrom', 'compTo', 'planned', 'recurrenceId', 'occurrence', 'notes', 'demo', 'createdAt', 'updatedAt', 'deleted', 'refundAmount', 'importId', 'docFileId', 'docName', 'mealVouchers', 'refundIn', 'toConfirm', 'extraordinary', 'time', 'importKey'],
   categories: ['id', 'name', 'icon', 'color', 'kind', 'group', 'splitMode', 'splitValue', 'order', 'excluded', 'updatedAt', 'deleted'],
   accounts: ['id', 'name', 'icon', 'kind', 'order', 'updatedAt', 'deleted', 'checkDate', 'checkBalance', 'voucherValue'],
   recurrences: ['id', 'name', 'kind', 'amount', 'categoryId', 'accountId', 'splitMode', 'splitValue', 'every', 'unit', 'start', 'endMode',
     'count', 'until', 'active', 'toVerify', 'skipped', 'driveFolderId', 'driveFolderName', 'notes', 'updatedAt', 'deleted', 'confirm', 'docTemplate', 'docSupply', 'docIgnored', 'refundable', 'refundAmount', 'amountAuto', 'refundIn', 'docDate'],
   rules: ['id', 'key', 'kind', 'categoryId', 'splitMode', 'splitValue', 'updatedAt', 'deleted'],
-  imports: ['id', 'name', 'from', 'to', 'rows', 'at', 'undone', 'updatedAt', 'deleted'],
-  methods: ['id', 'name', 'icon', 'order', 'updatedAt', 'deleted']
+  imports: ['id', 'name', 'from', 'to', 'rows', 'at', 'undone', 'updatedAt', 'deleted']
 };
 
 const NUM = new Set(['amount', 'refundAmount', 'splitValue', 'order', 'every', 'count', 'createdAt', 'updatedAt', 'mealVouchers', 'checkBalance', 'voucherValue', 'rows', 'at']);

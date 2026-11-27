@@ -205,8 +205,6 @@ function withNewSeedCategories(s: AppState): AppState {
   const haveA = new Set(s.accounts.map((a) => a.id));
   const cats = init.categories.filter((c) => !haveC.has(c.id));
   const accs = init.accounts.filter((a) => !haveA.has(a.id));
-  // metodi di pagamento: proposti solo la prima volta (poi l'elenco è dell'utente)
-  const methods = s.methods?.length ? s.methods : init.methods;
-  if (!cats.length && !accs.length && methods === s.methods) return s;
-  return { ...s, categories: [...s.categories, ...cats], accounts: [...s.accounts, ...accs], methods };
+  if (!cats.length && !accs.length) return s;
+  return { ...s, categories: [...s.categories, ...cats], accounts: [...s.accounts, ...accs] };
 }

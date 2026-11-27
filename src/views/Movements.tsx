@@ -58,7 +58,6 @@ export function Movements({ onEdit }: { onEdit: (m: Movement) => void }) {
   }, [list]);
 
   const accounts = new Map(state.accounts.map((a) => [a.id, a]));
-  const methods = new Map((state.methods ?? []).map((x) => [x.id, x]));
 
   return (
     <div className="page">
@@ -126,7 +125,6 @@ export function Movements({ onEdit }: { onEdit: (m: Movement) => void }) {
                       {m.time && <span className="dot-sep">{m.time}</span>}
                       {c && m.description && m.description !== c.name && <span>{c.name}</span>}
                       {acc && <span className="dot-sep"><Icon name={acc.icon} size={12} /> {acc.name}</span>}
-                      {m.methodId && methods.get(m.methodId) && <span className="dot-sep">{methods.get(m.methodId)!.name}</span>}
                     </span>
                     <span className="row-tags">
                       <SplitBadge split={m.split} />
